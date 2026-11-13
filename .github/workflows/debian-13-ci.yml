@@ -29,9 +29,13 @@ jobs:
         run: dpkg-buildpackage -us -uc -b
       - name: Verify package metadata
         run: dpkg-deb --info ../jatayu-update-manager_1.2.0-1_all.deb
+      - name: Stage Debian package for upload
+        run: |
+          mkdir -p artifacts
+          cp ../jatayu-update-manager_1.2.0-1_all.deb artifacts/
       - name: Upload development package artifact
         uses: actions/upload-artifact@v4
         with:
           name: jatayu-update-manager-debian13
-          path: ../jatayu-update-manager_1.2.0-1_all.deb
+          path: artifacts/jatayu-update-manager_1.2.0-1_all.deb
           if-no-files-found: error
