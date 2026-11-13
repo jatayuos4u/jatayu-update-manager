@@ -1,0 +1,17 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.build/
+build/
+dist/
+*.deb
+*.build
+*.buildinfo
+*.changes
+*.dsc
+*.tar.*
+debian/.debhelper/
+debian/debhelper-build-stamp
+debian/jatayu-update-manager/
+debian/files
