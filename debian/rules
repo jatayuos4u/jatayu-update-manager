@@ -1,0 +1,18 @@
+#!/usr/bin/make -f
+%:
+	dh $@ --with python3
+
+override_dh_auto_build:
+	:
+
+override_dh_auto_install:
+	install -d debian/jatayu-update-manager/usr/lib/python3/dist-packages/jatayu_update_manager
+	install -m 644 src/jatayu_update_manager/*.py debian/jatayu-update-manager/usr/lib/python3/dist-packages/jatayu_update_manager/
+	install -d debian/jatayu-update-manager/usr/bin
+	install -m 755 scripts/jatayu-update-manager debian/jatayu-update-manager/usr/bin/jatayu-update-manager
+	install -d debian/jatayu-update-manager/usr/lib/jatayu-update-manager
+	install -m 755 helper/privileged-helper debian/jatayu-update-manager/usr/lib/jatayu-update-manager/privileged-helper
+	install -d debian/jatayu-update-manager/usr/share/polkit-1/actions
+	install -m 644 polkit/in.jatayuos.update-manager.policy debian/jatayu-update-manager/usr/share/polkit-1/actions/
+	install -d debian/jatayu-update-manager/usr/share/applications
+	install -m 644 assets/in.jatayuos.update-manager.desktop debian/jatayu-update-manager/usr/share/applications/

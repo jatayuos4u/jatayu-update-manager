@@ -1,0 +1,3 @@
+#!/usr/bin/python3
+from jatayu_update_manager.main import main
+raise SystemExit(main())

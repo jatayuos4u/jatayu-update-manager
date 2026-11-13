@@ -1,0 +1,30 @@
+#!/usr/bin/python3
+"""Restricted privileged APT operations. Invoked ONLY through polkit/pkexec."""
+import os
+import subprocess
+import sys
+
+COMMANDS = {
+    'refresh': ['/usr/bin/apt-get', 'update'],
+    'upgrade': ['/usr/bin/apt-get', '-y', '--no-remove', 'upgrade'],
+}
+
+def main():
+    if os.geteuid() != 0:
+        print('This operation requires administrator authorization.', file=sys.stderr)
+        return 1
+    if len(sys.argv) != 2 or sys.argv[1] not in COMMANDS:
+        print('Invalid action.', file=sys.stderr)
+        return 2
+    action = sys.argv[1]
+    env = {'PATH': '/usr/sbin:/usr/bin:/sbin:/bin', 'LANG': 'C.UTF-8',
+           'DEBIAN_FRONTEND': 'noninteractive', 'HOME': '/root'}
+    command = COMMANDS[action] + ['-o', 'Dpkg::Use-Pty=0']
+    try:
+        return subprocess.run(command, env=env, cwd='/', check=False).returncode
+    except OSError as exc:
+        print(f'Cannot execute APT: {exc}', file=sys.stderr)
+        return 1
+
+if __name__ == '__main__':
+    sys.exit(main())

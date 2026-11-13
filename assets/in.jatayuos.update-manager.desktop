@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Jatayu Update Manager
+Name[hi]=जटायु अपडेट प्रबंधक
+Comment=Manage system package updates
+Comment[hi]=सिस्टम पैकेज अपडेट प्रबंधित करें
+Exec=jatayu-update-manager
+Icon=system-software-update
+Terminal=false
+Categories=System;Settings;
+Keywords=update;upgrade;apt;jatayu;

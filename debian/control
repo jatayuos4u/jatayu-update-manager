@@ -1,0 +1,15 @@
+Source: jatayu-update-manager
+Section: admin
+Priority: optional
+Maintainer: JatayuOS Team <maintainers@jatayuos.in>
+Build-Depends: debhelper-compat (= 13), dh-python, python3
+Standards-Version: 4.6.2
+Rules-Requires-Root: no
+Homepage: https://jatayuos.in
+
+Package: jatayu-update-manager
+Architecture: all
+Depends: ${misc:Depends}, ${python3:Depends}, python3-apt, python3-pyqt6, pkexec, polkitd, apt, python3
+Description: Graphical APT update manager for JatayuOS
+ KDE-compatible APT update manager with English and Hindi interface.
+ Uses a restricted polkit-authorized helper for privileged operations.

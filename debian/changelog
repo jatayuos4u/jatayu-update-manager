@@ -1,0 +1,13 @@
+jatayu-update-manager (1.2.0-1) unstable; urgency=medium
+
+  * Add translated empty states, search and persistent check timestamp.
+  * Improve failure reporting and update list presentation.
+
+ -- JatayuOS Team <maintainers@jatayuos.in>  Fri, 13 Nov 2026 10:00:00 +0530
+
+jatayu-update-manager (1.1.0-1) unstable; urgency=medium
+
+  * Redesigned responsive dashboard, dark/light palette and bilingual status cards.
+  * Preserve restricted APT helper and polkit authorization.
+
+ -- JatayuOS Team <maintainers@jatayuos.in>  Fri, 13 Nov 2026 10:00:00 +0530
