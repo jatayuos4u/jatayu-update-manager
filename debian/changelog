@@ -1,3 +1,12 @@
+jatayu-update-manager (1.2.1-1) unstable; urgency=medium
+
+  * Add simulated APT transaction preview and privileged re-validation.
+  * Refuse package removals and unexpected transaction changes.
+  * Improve Qt process start failure and window close handling.
+  * Add defensive transaction and privileged helper tests.
+
+ -- JatayuOS Team <maintainers@jatayuos.in>  Tue, 17 Nov 2026 09:30:00 +0530
+
 jatayu-update-manager (1.2.0-1) unstable; urgency=medium
 
   * Add translated empty states, search and persistent check timestamp.

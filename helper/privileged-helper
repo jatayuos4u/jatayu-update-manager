@@ -1,27 +1,48 @@
 #!/usr/bin/python3
-"""Restricted privileged APT operations. Invoked ONLY through polkit/pkexec."""
+"""Polkit-protected APT actions. Only fixed commands; no shell interpretation."""
 import os
+import re
 import subprocess
 import sys
+from jatayu_update_manager.transaction import parse_simulation, SimulationError
 
-COMMANDS = {
-    'refresh': ['/usr/bin/apt-get', 'update'],
-    'upgrade': ['/usr/bin/apt-get', '-y', '--no-remove', 'upgrade'],
-}
+APT = '/usr/bin/apt-get'
+ENV = {'PATH': '/usr/sbin:/usr/bin:/sbin:/bin',
+       'LANG': 'C.UTF-8', 'LC_ALL': 'C.UTF-8',
+       'DEBIAN_FRONTEND': 'noninteractive', 'HOME': '/root'}
 
-def main():
+def preview():
+    command = [APT, '-s', '--no-remove', 'upgrade']
+    result = subprocess.run(command, env=ENV, cwd='/', check=False,
+                            capture_output=True, text=True, timeout=120)
+    if result.returncode:
+        raise SimulationError('APT simulation failed: ' + result.stderr[-1000:])
+    return parse_simulation(result.stdout)
+
+def main(argv=None):
+    args = sys.argv[1:] if argv is None else argv
     if os.geteuid() != 0:
-        print('This operation requires administrator authorization.', file=sys.stderr)
+        print('Administrator authorization required.', file=sys.stderr)
         return 1
-    if len(sys.argv) != 2 or sys.argv[1] not in COMMANDS:
-        print('Invalid action.', file=sys.stderr)
+    if args == ['refresh']:
+        command = [APT, 'update', '-o', 'Dpkg::Use-Pty=0']
+    elif len(args) == 2 and args[0] == 'upgrade' and re.fullmatch(r'[a-f0-9]{64}', args[1]):
+        try:
+            current = preview()
+        except (OSError, subprocess.TimeoutExpired, SimulationError) as exc:
+            print('Upgrade blocked: ' + str(exc), file=sys.stderr)
+            return 3
+        if current.digest != args[1]:
+            print('APT upgrade plan changed since confirmation. Refresh and review again.', file=sys.stderr)
+            return 4
+        command = [APT, '-y', '--no-remove', 'upgrade',
+                   '-o', 'Dpkg::Use-Pty=0',
+                   '-o', 'Dpkg::Options::=--force-confold']
+    else:
+        print('Invalid action or transaction fingerprint.', file=sys.stderr)
         return 2
-    action = sys.argv[1]
-    env = {'PATH': '/usr/sbin:/usr/bin:/sbin:/bin', 'LANG': 'C.UTF-8',
-           'DEBIAN_FRONTEND': 'noninteractive', 'HOME': '/root'}
-    command = COMMANDS[action] + ['-o', 'Dpkg::Use-Pty=0']
     try:
-        return subprocess.run(command, env=env, cwd='/', check=False).returncode
+        return subprocess.run(command, env=ENV, cwd='/', check=False).returncode
     except OSError as exc:
         print(f'Cannot execute APT: {exc}', file=sys.stderr)
         return 1

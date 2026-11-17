@@ -1,4 +1,4 @@
-name: Debian 13 package build and tests
+name: Debian 13 package build and security tests
 
 on:
   push:
@@ -18,24 +18,29 @@ jobs:
       - name: Install build and test dependencies
         run: |
           apt-get update
-          apt-get install -y --no-install-recommends ca-certificates git python3 python3-apt python3-pyqt6 build-essential debhelper dh-python dpkg-dev pkexec polkitd libxml2-utils
+          apt-get install -y --no-install-recommends ca-certificates git python3 python3-apt python3-pyqt6 build-essential debhelper dh-python dpkg-dev pkexec polkitd libxml2-utils python3-bandit
       - uses: actions/checkout@v4
-      - name: Syntax and translations
+      - name: Run security checks and unit tests
         run: |
           PYTHONPATH=src python3 -m unittest discover -s tests -v
           python3 -m compileall -q src helper scripts
           xmllint --noout polkit/in.jatayuos.update-manager.policy
+          bandit -q -r src helper -s B404,B603,B607
       - name: Build Debian package
         run: dpkg-buildpackage -us -uc -b
-      - name: Verify package metadata
-        run: dpkg-deb --info ../jatayu-update-manager_1.2.0-1_all.deb
-      - name: Stage Debian package for upload
+      - name: Verify package metadata and security properties
+        run: |
+          dpkg-deb --info ../jatayu-update-manager_1.2.1-1_all.deb
+          dpkg-deb --contents ../jatayu-update-manager_1.2.1-1_all.deb | grep -F 'privileged-helper'
+      - name: Stage Debian package
         run: |
           mkdir -p artifacts
-          cp ../jatayu-update-manager_1.2.0-1_all.deb artifacts/
-      - name: Upload development package artifact
+          cp ../jatayu-update-manager_1.2.1-1_all.deb artifacts/
+          cd artifacts
+          sha256sum jatayu-update-manager_1.2.1-1_all.deb > SHA256SUMS
+      - name: Upload test artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: jatayu-update-manager-debian13
-          path: artifacts/jatayu-update-manager_1.2.0-1_all.deb
+          name: jatayu-update-manager-1.2.1-test
+          path: artifacts/
           if-no-files-found: error
