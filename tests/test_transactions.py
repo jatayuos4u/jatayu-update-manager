@@ -1,5 +1,6 @@
 import hashlib
 import importlib.util
+from importlib.machinery import SourceFileLoader
 import pathlib
 import subprocess
 import unittest
@@ -10,7 +11,7 @@ from jatayu_update_manager.transaction import parse_simulation, SimulationError
 HELPER_PATH = pathlib.Path(__file__).resolve().parents[1] / 'helper' / 'privileged-helper'
 
 def load_helper():
-    spec = importlib.util.spec_from_file_location('jatayu_privileged_helper', HELPER_PATH)
+    spec = importlib.util.spec_from_loader('jatayu_privileged_helper', SourceFileLoader('jatayu_privileged_helper', str(HELPER_PATH)))
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     return mod
