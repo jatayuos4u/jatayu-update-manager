@@ -1,20 +1,20 @@
 # Jatayu Update Manager
 
-[![Release](https://img.shields.io/badge/release-v1.2.0--rc1-orange)](https://github.com/jatayuos4u/jatayu-update-manager/releases/tag/v1.2.0-rc1)
+[![Release](https://img.shields.io/badge/release-v1.2.0--rc1-orange)](https://github.com/jatayuos4u/jatayu-update-manager/releases/tag/v1.2.1-rc1)
 [![Debian](https://img.shields.io/badge/Debian-13%20Trixie-blue)](https://www.debian.org/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-**Jatayu Update Manager 1.2.0** is a PyQt6 graphical APT update manager for [JatayuOS](https://jatayuos.in), based on Debian 13 Trixie and KDE Plasma.
+**Jatayu Update Manager 1.2.1** is a PyQt6 graphical APT update manager for [JatayuOS](https://jatayuos.in), based on Debian 13 Trixie and KDE Plasma.
 
 > [!WARNING]
-> **Pre-release / Testing (v1.2.0-rc1):** Not yet approved for production systems or inclusion in the stable JatayuOS ISO. Real package upgrades, Polkit cancellation, offline errors, and APT lock handling need further testing. Try it on a disposable VM or backed-up test system.
+> **Pre-release / Testing (v1.2.1-rc1):** Not yet approved for production systems or inclusion in the stable JatayuOS ISO. Real package upgrades, Polkit cancellation, offline errors, and APT lock handling need further testing. Try it on a disposable VM or backed-up test system.
 
 ## Download Jatayu Update Manager
 
-**[⬇ Download Jatayu Update Manager 1.2.0 RC1 (.deb)](https://github.com/jatayuos4u/jatayu-update-manager/releases/download/v1.2.0-rc1/jatayu-update-manager_1.2.0-1_all.deb)**
+**[⬇ Download Jatayu Update Manager 1.2.1 RC1 (.deb)](https://github.com/jatayuos4u/jatayu-update-manager/releases/download/v1.2.1-rc1/jatayu-update-manager_1.2.1-1_all.deb)**
 
-- [View the official GitHub release and notes](https://github.com/jatayuos4u/jatayu-update-manager/releases/tag/v1.2.0-rc1)
-- [Download SHA-256 checksums](https://github.com/jatayuos4u/jatayu-update-manager/releases/download/v1.2.0-rc1/SHA256SUMS)
+- [View the official GitHub release and notes](https://github.com/jatayuos4u/jatayu-update-manager/releases/tag/v1.2.1-rc1)
+- [Download SHA-256 checksums](https://github.com/jatayuos4u/jatayu-update-manager/releases/download/v1.2.1-rc1/SHA256SUMS)
 - [See all releases](https://github.com/jatayuos4u/jatayu-update-manager/releases)
 
 ### Install the downloaded package
@@ -22,7 +22,7 @@
 Open Konsole in the folder containing the downloaded `.deb` file, then run:
 
 ```bash
-sudo apt install ./jatayu-update-manager_1.2.0-1_all.deb
+sudo apt install ./jatayu-update-manager_1.2.1-1_all.deb
 jatayu-update-manager
 ```
 
@@ -52,7 +52,7 @@ sudo apt install --no-install-recommends build-essential debhelper dh-python dpk
 dpkg-buildpackage -us -uc -b
 ```
 
-The package is written to the parent directory, e.g. `../jatayu-update-manager_1.2.0-1_all.deb`.
+The package is written to the parent directory, e.g. `../jatayu-update-manager_1.2.1-1_all.deb`.
 
 ## Test and run from source
 
@@ -96,6 +96,6 @@ MIT. See [LICENSE](LICENSE) and [debian/copyright](debian/copyright). The mainta
 - Update Manager: https://github.com/jatayuos4u/jatayu-update-manager
 
 
-## 1.2.1 security hardening (development branch)
+## 1.2.1 security hardening (pre-release)
 
-Version 1.2.1 is not released. It adds a simulated APT transaction review; the privileged helper re-simulates the exact installation plan and rejects mismatches or removals. UI closing is blocked while commands run, but process-crash durability is not guaranteed. Integration tests on an actual JatayuOS VM remain required.
+Version 1.2.1 RC1 is published for testing. It adds a simulated APT transaction review; the privileged helper re-simulates the exact installation plan and rejects mismatches or removals. UI closing is blocked while commands run, but process-crash durability is not guaranteed. Integration tests on an actual JatayuOS VM remain required.
