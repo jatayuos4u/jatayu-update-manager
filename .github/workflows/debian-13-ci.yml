@@ -19,7 +19,7 @@ jobs:
         run: |
           apt-get update
           apt-get install -y --no-install-recommends ca-certificates git python3 python3-apt python3-pyqt6 build-essential debhelper dh-python dpkg-dev pkexec polkitd libxml2-utils python3-bandit
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - name: Run security checks and unit tests
         run: |
           PYTHONPATH=src python3 -m unittest discover -s tests -v
@@ -39,7 +39,7 @@ jobs:
           cd artifacts
           sha256sum jatayu-update-manager_1.2.1-1_all.deb > SHA256SUMS
       - name: Upload test artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: jatayu-update-manager-1.2.1-test
           path: artifacts/
