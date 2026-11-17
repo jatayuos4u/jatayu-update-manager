@@ -336,6 +336,7 @@ class MainWindow(QMainWindow):
         self.busy = False
         self.progress.hide()
         if code != 0 or status != QProcess.ExitStatus.NormalExit:
+            self.checked = False
             self.last_error = self.t('preview_failed')
             self.log.setPlainText(output)
             self.tabs.setCurrentIndex(2)
@@ -344,17 +345,20 @@ class MainWindow(QMainWindow):
         try:
             preview = parse_simulation(output)
         except SimulationError as exc:
+            self.checked = False
             self.last_error = str(exc)
             self.log.setPlainText(output)
             self.tabs.setCurrentIndex(2)
             self.translate_ui()
             return
+        self.last_error = None
         self.translate_ui()
         dialog = QMessageBox(self)
         dialog.setWindowTitle(self.t('install'))
         dialog.setIcon(QMessageBox.Icon.Warning)
         dialog.setText(self.t('preview_question', count=len(preview.installs)))
-        dialog.setInformativeText(self.t('preview_warning'))
+        dialog.setInformativeText(self.t('preview_warning') + '\n\n' +
+                                  '\n'.join(preview.installs[:8]))
         dialog.setDetailedText('\n'.join(preview.installs))
         dialog.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
         dialog.setDefaultButton(QMessageBox.StandardButton.No)
