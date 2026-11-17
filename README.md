@@ -94,3 +94,8 @@ MIT. See [LICENSE](LICENSE) and [debian/copyright](debian/copyright). The mainta
 - Website: https://jatayuos.in
 - Main OS repository: https://github.com/jatayuos4u/jatayuos
 - Update Manager: https://github.com/jatayuos4u/jatayu-update-manager
+
+
+## 1.2.1 security hardening (development branch)
+
+Version 1.2.1 is not released. It adds a simulated APT transaction review; the privileged helper re-simulates the exact installation plan and rejects mismatches or removals. UI closing is blocked while commands run, but process-crash durability is not guaranteed. Integration tests on an actual JatayuOS VM remain required.

@@ -1,5 +1,6 @@
 STRINGS = {
 'en': {
+ 'previewing':'Reviewing the planned upgrade…', 'preview_failed':'Unable to preview updates. Nothing was installed.', 'preview_question':'Install {count} planned package update(s)?', 'preview_warning':'Review the exact APT plan below. No packages should be removed. APT can run package scripts as root.', 'do_not_close':'An APT operation is running. Do not close this window until it finishes.',
  'search':'Search packages…', 'failed_generic':'Could not check updates', 'working':'Working…', 'wait':'Please wait for the operation to finish.', 'none_detail':'No APT upgrades were found during the last successful check.', 'not_checked':'Updates not checked yet', 'check_prompt':'Select Check for updates to refresh the package lists.',
  'system_status':'System update status', 'updates_count':'Available updates', 'last_check':'Last checked', 'manager':'Package manager', 'title':'Jatayu Update Manager', 'subtitle':'Keep your JatayuOS system up to date',
  'updates':'Available updates', 'check':'Check for updates', 'install':'Install updates',
@@ -17,6 +18,7 @@ STRINGS = {
  'error':'Error', 'info':'Information', 'history_missing':'APT history is unavailable.'
 },
 'hi': {
+ 'previewing':'प्रस्तावित अपडेट जाँचे जा रहे हैं…', 'preview_failed':'अपडेट का पूर्वावलोकन नहीं हो सका। कोई अपडेट इंस्टॉल नहीं हुआ।', 'preview_question':'{count} प्रस्तावित पैकेज अपडेट इंस्टॉल करें?', 'preview_warning':'APT योजना की समीक्षा करें। कोई पैकेज हटाया नहीं जाना चाहिए। पैकेज स्क्रिप्ट व्यवस्थापक के रूप में चल सकती हैं।', 'do_not_close':'APT कार्य चल रहा है। पूरा होने से पहले यह विंडो बंद न करें।',
  'search':'पैकेज खोजें…', 'failed_generic':'अपडेट जाँच नहीं हो सकी', 'working':'कार्य जारी है…', 'wait':'कृपया कार्य पूरा होने तक प्रतीक्षा करें।', 'none_detail':'पिछली सफल जाँच में कोई APT अपडेट नहीं मिला।', 'not_checked':'अभी अपडेट की जाँच नहीं हुई', 'check_prompt':'पैकेज सूची अपडेट करने के लिए अपडेट जाँचें चुनें।',
  'system_status':'सिस्टम अपडेट की स्थिति', 'updates_count':'उपलब्ध अपडेट', 'last_check':'पिछली जाँच', 'manager':'पैकेज प्रबंधक', 'title':'जटायु अपडेट प्रबंधक', 'subtitle':'अपने JatayuOS सिस्टम को अपडेट रखें',
  'updates':'उपलब्ध अपडेट', 'check':'अपडेट जाँचें', 'install':'अपडेट इंस्टॉल करें',

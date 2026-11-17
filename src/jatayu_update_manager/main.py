@@ -1,9 +1,11 @@
 """Jatayu Update Manager: native Qt dashboard for Debian APT."""
 import sys
-from PyQt6.QtCore import Qt, QProcess, QSettings
+from PyQt6.QtCore import Qt, QProcess, QSettings, QSize
+from PyQt6.QtGui import QIcon
+from .transaction import parse_simulation, SimulationError
 from PyQt6.QtWidgets import (QApplication, QComboBox, QFrame, QHBoxLayout, QLabel,
     QMainWindow, QMessageBox, QPushButton, QProgressBar, QTabWidget, QTableWidget,
-    QTableWidgetItem, QTextEdit, QVBoxLayout, QWidget, QHeaderView, QAbstractItemView, QStackedWidget, QLineEdit)
+    QTableWidgetItem, QTextEdit, QVBoxLayout, QWidget, QHeaderView, QAbstractItemView, QStackedWidget, QLineEdit, QStyle)
 from .core import available_updates, recent_history
 from .i18n import tr
 
@@ -20,6 +22,7 @@ class MainWindow(QMainWindow):
         self.busy = False
         self.process = None
         self.operation = None
+        self.preview_output = bytearray()
         self.build_ui()
         self.load_updates()
 
@@ -32,6 +35,21 @@ class MainWindow(QMainWindow):
         frame.setFrameShape(QFrame.Shape.NoFrame)
         return frame
 
+    def resolve_app_icon(self):
+        # Match Icon=system-software-update in the desktop launcher.
+        for name in ('system-software-update', 'software-update-available',
+                     'update-none', 'preferences-system'):
+            icon = QIcon.fromTheme(name)
+            if not icon.isNull():
+                return icon
+        return self.style().standardIcon(QStyle.StandardPixmap.SP_BrowserReload)
+
+    def set_brand_icon(self):
+        icon = self.resolve_app_icon()
+        self.setWindowIcon(icon)
+        self.brand_label.setPixmap(icon.pixmap(QSize(42, 42)))
+        self.brand_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
     def build_ui(self):
         self.setMinimumSize(850, 660)
         self.resize(990, 730)
@@ -43,11 +61,10 @@ class MainWindow(QMainWindow):
         outer.setSpacing(17)
 
         header = QHBoxLayout()
-        brand = QLabel('✦')
-        brand.setObjectName('brand')
-        brand.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        brand.setFixedSize(50, 50)
-        header.addWidget(brand)
+        self.brand_label = QLabel()
+        self.brand_label.setObjectName('brand')
+        self.brand_label.setFixedSize(50, 50)
+        header.addWidget(self.brand_label)
         headings = QVBoxLayout()
         headings.setSpacing(3)
         self.title_label = QLabel()
@@ -189,6 +206,7 @@ class MainWindow(QMainWindow):
         outer.addWidget(self.note)
         self.translate_ui()
         self.apply_theme()
+        self.set_brand_icon()
 
     def apply_theme(self):
         palette = QApplication.palette()
@@ -204,7 +222,7 @@ class MainWindow(QMainWindow):
             QLabel#heading {{ font-size: 23px; font-weight: 700; }}
             QLabel#heroTitle {{ font-size: 18px; font-weight: 700; }}
             QLabel#muted {{ color: {muted}; }}
-            QLabel#brand {{ background: {accent}; color: white; font-size: 27px; font-weight: bold; border-radius: 13px; }}
+            QLabel#brand {{ background: transparent; border: none; }}
             QLabel#heroIcon {{ color: {accent}; font-size: 31px; padding-right: 12px; }}
             QLabel#metricIcon {{ color: {accent}; font-size: 17px; }}
             QLabel#metricValue {{ font-size: 27px; font-weight: 700; }}
@@ -306,10 +324,72 @@ class MainWindow(QMainWindow):
         if not self.checked:
             QMessageBox.information(self, self.t('info'), self.t('refresh_first'))
             return
-        if QMessageBox.question(self, self.t('install'), self.t('confirm')) == QMessageBox.StandardButton.Yes:
-            self.run_operation('upgrade')
+        if self.busy or self.table.rowCount() == 0:
+            return
+        # Run an unprivileged APT simulation before asking for authorization.
+        self.busy = True
+        self.operation = 'preview'
+        self.preview_output = bytearray()
+        self.check_button.setEnabled(False)
+        self.install_button.setEnabled(False)
+        self.status.setText(self.t('previewing'))
+        self.progress.setRange(0, 0)
+        self.progress.show()
+        self.process = QProcess(self)
+        self.process.setProcessChannelMode(QProcess.ProcessChannelMode.MergedChannels)
+        self.process.readyReadStandardOutput.connect(self.read_output)
+        self.process.errorOccurred.connect(self.process_error)
+        self.process.finished.connect(self.preview_finished)
+        self.process.start('/usr/bin/apt-get', ['-s', '--no-remove', 'upgrade'])
 
-    def run_operation(self, action):
+    def preview_finished(self, code, status):
+        if self.operation != 'preview':
+            return
+        self.read_output()
+        output = self.preview_output.decode('utf-8', errors='replace')
+        self.process = None
+        self.operation = None
+        self.busy = False
+        self.progress.hide()
+        if code != 0 or status != QProcess.ExitStatus.NormalExit:
+            self.checked = False
+            self.last_error = self.t('preview_failed')
+            self.log.setPlainText(output)
+            self.tabs.setCurrentIndex(2)
+            self.translate_ui()
+            return
+        try:
+            preview = parse_simulation(output)
+        except SimulationError as exc:
+            self.checked = False
+            self.last_error = str(exc)
+            self.log.setPlainText(output)
+            self.tabs.setCurrentIndex(2)
+            self.translate_ui()
+            return
+        self.last_error = None
+        self.translate_ui()
+        dialog = QMessageBox(self)
+        dialog.setWindowTitle(self.t('install'))
+        dialog.setIcon(QMessageBox.Icon.Warning)
+        dialog.setText(self.t('preview_question', count=len(preview.installs)))
+        dialog.setInformativeText(self.t('preview_warning') + '\n\n' +
+                                  '\n'.join(preview.installs[:8]))
+        dialog.setDetailedText('\n'.join(preview.installs))
+        dialog.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+        dialog.setDefaultButton(QMessageBox.StandardButton.No)
+        if dialog.exec() == QMessageBox.StandardButton.Yes:
+            self.run_operation('upgrade', preview.digest)
+
+    def closeEvent(self, event):
+        # This protects against ordinary window closure, not abrupt crashes.
+        if self.busy:
+            QMessageBox.warning(self, self.t('working'), self.t('do_not_close'))
+            event.ignore()
+            return
+        event.accept()
+
+    def run_operation(self, action, digest=None):
         if self.busy:
             return
         self.busy = True
@@ -332,19 +412,35 @@ class MainWindow(QMainWindow):
         self.process.readyReadStandardOutput.connect(self.read_output)
         self.process.finished.connect(self.finished)
         self.process.errorOccurred.connect(self.process_error)
-        self.process.start('/usr/bin/pkexec', [HELPER, action])
+        args = [HELPER, action] + ([digest] if action == 'upgrade' else [])
+        self.process.start('/usr/bin/pkexec', args)
 
     def read_output(self):
         if self.process is None:
             return
-        data = bytes(self.process.readAllStandardOutput()).decode('utf-8', errors='replace')
+        raw = bytes(self.process.readAllStandardOutput())
+        if self.operation == 'preview':
+            self.preview_output.extend(raw)
+            return
+        data = raw.decode('utf-8', errors='replace')
         self.log.moveCursor(self.log.textCursor().MoveOperation.End)
         self.log.insertPlainText(data)
 
     def process_error(self, error):
-        self.log.append(f'Process error: {error}')
+        if error == QProcess.ProcessError.FailedToStart and self.busy:
+            self.last_error = self.t('failed_generic')
+            self.busy = False
+            self.operation = None
+            self.progress.hide()
+            self.process = None
+            self.translate_ui()
+            QMessageBox.warning(self, self.t('error'), self.last_error)
+        else:
+            self.log.append(f'Process error: {error}')
 
     def finished(self, code, status):
+        if self.operation not in ('refresh', 'upgrade'):
+            return
         self.read_output()
         success = code == 0 and status == QProcess.ExitStatus.NormalExit
         self.busy = False
@@ -357,15 +453,18 @@ class MainWindow(QMainWindow):
             self.metric_values[1].setText(self.last_success)
         self.last_error = None if success else self.t('failed', code=code)
         self.load_updates()
-        self.refresh_empty_state()
-        self.check_button.setEnabled(True)
-        self.install_button.setEnabled(self.checked and self.table.rowCount() > 0)
-        if not success:
-            self.status.setText(self.t('failed', code=code))
+        if self.last_error:
+            self.checked = False
+            self.status.setText(self.last_error)
         elif self.operation == 'upgrade':
+            # Require another successful refresh before offering another install.
+            self.checked = False
             self.status.setText(self.t('success') + ' ' + self.t('restart'))
         elif self.operation == 'refresh':
             self.tabs.setCurrentIndex(0)
+        self.refresh_empty_state()
+        self.check_button.setEnabled(True)
+        self.install_button.setEnabled(self.checked and self.table.rowCount() > 0 and not self.last_error)
         self.operation = None
         self.process = None
         self.refresh_empty_state()
