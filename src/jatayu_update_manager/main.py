@@ -1,10 +1,11 @@
 """Jatayu Update Manager: native Qt dashboard for Debian APT."""
 import sys
-from PyQt6.QtCore import Qt, QProcess, QSettings
+from PyQt6.QtCore import Qt, QProcess, QSettings, QSize
+from PyQt6.QtGui import QIcon
 from .transaction import parse_simulation, SimulationError
 from PyQt6.QtWidgets import (QApplication, QComboBox, QFrame, QHBoxLayout, QLabel,
     QMainWindow, QMessageBox, QPushButton, QProgressBar, QTabWidget, QTableWidget,
-    QTableWidgetItem, QTextEdit, QVBoxLayout, QWidget, QHeaderView, QAbstractItemView, QStackedWidget, QLineEdit)
+    QTableWidgetItem, QTextEdit, QVBoxLayout, QWidget, QHeaderView, QAbstractItemView, QStackedWidget, QLineEdit, QStyle)
 from .core import available_updates, recent_history
 from .i18n import tr
 
@@ -34,6 +35,21 @@ class MainWindow(QMainWindow):
         frame.setFrameShape(QFrame.Shape.NoFrame)
         return frame
 
+    def resolve_app_icon(self):
+        # Match Icon=system-software-update in the desktop launcher.
+        for name in ('system-software-update', 'software-update-available',
+                     'update-none', 'preferences-system'):
+            icon = QIcon.fromTheme(name)
+            if not icon.isNull():
+                return icon
+        return self.style().standardIcon(QStyle.StandardPixmap.SP_BrowserReload)
+
+    def set_brand_icon(self):
+        icon = self.resolve_app_icon()
+        self.setWindowIcon(icon)
+        self.brand_label.setPixmap(icon.pixmap(QSize(42, 42)))
+        self.brand_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
     def build_ui(self):
         self.setMinimumSize(850, 660)
         self.resize(990, 730)
@@ -45,11 +61,10 @@ class MainWindow(QMainWindow):
         outer.setSpacing(17)
 
         header = QHBoxLayout()
-        brand = QLabel('✦')
-        brand.setObjectName('brand')
-        brand.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        brand.setFixedSize(50, 50)
-        header.addWidget(brand)
+        self.brand_label = QLabel()
+        self.brand_label.setObjectName('brand')
+        self.brand_label.setFixedSize(50, 50)
+        header.addWidget(self.brand_label)
         headings = QVBoxLayout()
         headings.setSpacing(3)
         self.title_label = QLabel()
@@ -191,6 +206,7 @@ class MainWindow(QMainWindow):
         outer.addWidget(self.note)
         self.translate_ui()
         self.apply_theme()
+        self.set_brand_icon()
 
     def apply_theme(self):
         palette = QApplication.palette()
@@ -206,7 +222,7 @@ class MainWindow(QMainWindow):
             QLabel#heading {{ font-size: 23px; font-weight: 700; }}
             QLabel#heroTitle {{ font-size: 18px; font-weight: 700; }}
             QLabel#muted {{ color: {muted}; }}
-            QLabel#brand {{ background: {accent}; color: white; font-size: 27px; font-weight: bold; border-radius: 13px; }}
+            QLabel#brand {{ background: transparent; border: none; }}
             QLabel#heroIcon {{ color: {accent}; font-size: 31px; padding-right: 12px; }}
             QLabel#metricIcon {{ color: {accent}; font-size: 17px; }}
             QLabel#metricValue {{ font-size: 27px; font-weight: 700; }}
