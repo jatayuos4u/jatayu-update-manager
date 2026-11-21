@@ -1,13 +1,14 @@
 """Jatayu Update Manager: native Qt dashboard for Debian APT."""
 import sys
-from PyQt6.QtCore import Qt, QProcess, QSettings, QSize
-from PyQt6.QtGui import QIcon
+from PyQt6.QtCore import Qt, QProcess, QSettings, QSize, QUrl
+from PyQt6.QtGui import QIcon, QAction, QDesktopServices
 from .transaction import parse_simulation, SimulationError
 from PyQt6.QtWidgets import (QApplication, QComboBox, QFrame, QHBoxLayout, QLabel,
     QMainWindow, QMessageBox, QPushButton, QProgressBar, QTabWidget, QTableWidget,
-    QTableWidgetItem, QTextEdit, QVBoxLayout, QWidget, QHeaderView, QAbstractItemView, QStackedWidget, QLineEdit, QStyle, QSizePolicy)
+    QTableWidgetItem, QTextEdit, QVBoxLayout, QWidget, QHeaderView, QAbstractItemView, QStackedWidget, QLineEdit, QStyle, QSizePolicy, QToolButton, QMenu, QDialog, QDialogButtonBox, QFormLayout)
 from .core import available_updates, recent_history
 from .i18n import tr
+from . import __version__
 
 HELPER = '/usr/lib/jatayu-update-manager/privileged-helper'
 
@@ -83,6 +84,25 @@ class MainWindow(QMainWindow):
         self.language_box.setCurrentIndex(0 if self.lang == 'en' else 1)
         self.language_box.currentIndexChanged.connect(self.change_language)
         header.addWidget(self.language_box)
+        self.menu_button = QToolButton()
+        self.menu_button.setText('⋮')
+        self.menu_button.setToolTip(self.t('menu'))
+        self.menu_button.setAccessibleName(self.t('menu'))
+        self.menu_button.setFixedSize(36, 36)
+        self.menu_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        self.app_menu = QMenu(self.menu_button)
+        self.menu_button.setMenu(self.app_menu)
+        self.about_action = QAction(self)
+        self.help_action = QAction(self)
+        self.issue_action = QAction(self)
+        self.license_action = QAction(self)
+        self.about_action.triggered.connect(self.show_about)
+        self.help_action.triggered.connect(self.show_help)
+        self.issue_action.triggered.connect(self.open_issues)
+        self.license_action.triggered.connect(self.show_license)
+        for action in (self.about_action, self.help_action, self.issue_action, self.license_action):
+            self.app_menu.addAction(action)
+        header.addWidget(self.menu_button)
         outer.addLayout(header)
 
         # Keep status and summary cards together so the user can expand the
@@ -265,12 +285,22 @@ class MainWindow(QMainWindow):
             QLabel#emptyIcon {{ color: {accent}; font-size: 38px; }}
             QLabel#emptyTitle {{ font-size: 18px; font-weight: 700; }}
             QHeaderView::section {{ background: {card}; color: {muted}; border: none; border-bottom: 1px solid {border}; padding: 10px; font-weight: 600; }}
+            QToolButton {{ background: {card}; border: 1px solid {border}; border-radius: 8px; color: {fg}; font-size: 20px; }}
+            QToolButton:hover {{ border-color: {accent}; }}
+            QMenu {{ background: {card}; color: {fg}; border: 1px solid {border}; padding: 5px; }}
+            QMenu::item {{ padding: 7px 20px; }}
+            QMenu::item:selected {{ background: {accent}; color: white; }}
             QProgressBar {{ background: {border}; border: none; border-radius: 3px; }}
             QProgressBar::chunk {{ background: {accent}; border-radius: 3px; }}
         """)
 
     def translate_ui(self):
         self.setWindowTitle(self.t('title'))
+        self.menu_button.setToolTip(self.t('menu'))
+        self.menu_button.setAccessibleName(self.t('menu'))
+        for action, key in ((self.about_action, 'about'), (self.help_action, 'help'),
+                            (self.issue_action, 'report_issue'), (self.license_action, 'license_credits')):
+            action.setText(self.t(key))
         self.title_label.setText(self.t('title'))
         self.subtitle_label.setText(self.t('subtitle'))
         self.hero_title.setText(self.t('system_status'))
@@ -292,6 +322,63 @@ class MainWindow(QMainWindow):
         self.refresh_empty_state()
         self.check_button.setEnabled(not self.busy)
         self.install_button.setEnabled(self.checked and self.table.rowCount() > 0 and not self.busy)
+
+    def build_about_dialog(self):
+        dialog = QDialog(self)
+        dialog.setWindowTitle(self.t('about'))
+        dialog.setWindowIcon(self.resolve_app_icon())
+        dialog.setMinimumWidth(430)
+        layout = QVBoxLayout(dialog)
+        layout.setContentsMargins(22, 20, 22, 16)
+        layout.setSpacing(12)
+        top = QHBoxLayout()
+        icon_label = QLabel()
+        icon_label.setPixmap(self.resolve_app_icon().pixmap(QSize(52, 52)))
+        top.addWidget(icon_label)
+        heading = QLabel(self.t('title'))
+        heading.setObjectName('heading')
+        heading.setStyleSheet('font-size: 20px; font-weight: bold;')
+        top.addWidget(heading, 1)
+        layout.addLayout(top)
+        description = QLabel(self.t('about_description'))
+        description.setWordWrap(True)
+        layout.addWidget(description)
+        fields = QFormLayout()
+        fields.addRow(self.t('version') + ':', QLabel(__version__.replace('rc', ' RC')))
+        fields.addRow(self.t('creator') + ':', QLabel('Anup Kumar Yadav'))
+        fields.addRow(self.t('developer') + ':', QLabel('JatayuOS Team'))
+        fields.addRow(self.t('license') + ':', QLabel('MIT'))
+        for key, address in (
+            ('website', 'https://jatayuos.in'),
+            ('source_code', 'https://github.com/jatayuos4u/jatayu-update-manager'),
+        ):
+            link = QLabel('<a href="' + address + '">' + address + '</a>')
+            link.setOpenExternalLinks(True)
+            fields.addRow(self.t(key) + ':', link)
+        layout.addLayout(fields)
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
+        buttons.rejected.connect(dialog.reject)
+        layout.addWidget(buttons)
+        return dialog
+
+    def show_about(self):
+        self.build_about_dialog().exec()
+
+    def show_help(self):
+        QMessageBox.information(self, self.t('help'), self.t('help_text'))
+
+    def show_license(self):
+        QMessageBox.information(
+            self, self.t('license_credits'),
+            self.t('license_info') + '\\n\\n' +
+            self.t('creator') + ': Anup Kumar Yadav\\n' +
+            self.t('developer') + ': JatayuOS Team\\n' +
+            self.t('license') + ': MIT\\n' +
+            'https://github.com/jatayuos4u/jatayu-update-manager/blob/main/LICENSE'
+        )
+
+    def open_issues(self):
+        QDesktopServices.openUrl(QUrl('https://github.com/jatayuos4u/jatayu-update-manager/issues'))
 
     def toggle_list_focus(self, expanded):
         self.list_expanded = expanded
