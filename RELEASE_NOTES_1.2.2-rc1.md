@@ -16,12 +16,12 @@ Jatayu Update Manager provides a bilingual (English/Hindi), KDE Plasma-compatibl
 
 ## Package and installation
 
-**Debian 13 / JatayuOS testing build:** `jatayu-update-manager_1.2.2~rc1-1_all.deb`
+**Debian 13 / JatayuOS testing build:** `jatayu-update-manager_1.2.2.rc1-1_all.deb`
 
 Download the .deb package and SHA256SUMS from this release. Check the download integrity with `sha256sum -c SHA256SUMS`, then install:
 
 ```bash
-sudo apt install ./jatayu-update-manager_1.2.2~rc1-1_all.deb
+sudo apt install ./jatayu-update-manager_1.2.2.rc1-1_all.deb
 jatayu-update-manager
 ```
 
