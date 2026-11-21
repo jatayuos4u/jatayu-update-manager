@@ -370,10 +370,10 @@ class MainWindow(QMainWindow):
     def show_license(self):
         QMessageBox.information(
             self, self.t('license_credits'),
-            self.t('license_info') + '\\n\\n' +
-            self.t('creator') + ': Anup Kumar Yadav\\n' +
-            self.t('developer') + ': JatayuOS Team\\n' +
-            self.t('license') + ': MIT\\n' +
+            self.t('license_info') + '\n\n' +
+            self.t('creator') + ': Anup Kumar Yadav\n' +
+            self.t('developer') + ': JatayuOS Team\n' +
+            self.t('license') + ': MIT\n' +
             'https://github.com/jatayuos4u/jatayu-update-manager/blob/main/LICENSE'
         )
 
