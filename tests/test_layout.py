@@ -65,3 +65,16 @@ class UpdateListLayoutTests(unittest.TestCase):
         self.window.lang = 'hi'
         self.window.translate_ui()
         self.assertEqual(self.window.about_action.text(), 'परिचय')
+
+    def test_desktop_icon_identity_and_packaged_svg(self):
+        from pathlib import Path
+        from jatayu_update_manager.main import DESKTOP_FILE_ID
+        root = Path(__file__).resolve().parents[1]
+        desktop = (root / 'assets/in.jatayuos.update-manager.desktop').read_text()
+        svg = (root / 'assets/jatayu-update-manager.svg').read_text()
+        rules = (root / 'debian/rules').read_text()
+        self.assertEqual(DESKTOP_FILE_ID, 'in.jatayuos.update-manager')
+        self.assertIn('Icon=jatayu-update-manager', desktop)
+        self.assertIn('StartupWMClass=jatayu-update-manager', desktop)
+        self.assertIn('viewBox="0 0 256 256"', svg)
+        self.assertIn('usr/share/icons/hicolor/scalable/apps', rules)

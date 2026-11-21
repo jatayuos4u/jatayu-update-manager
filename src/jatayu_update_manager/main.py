@@ -1,5 +1,6 @@
 """Jatayu Update Manager: native Qt dashboard for Debian APT."""
 import sys
+from pathlib import Path
 from PyQt6.QtCore import Qt, QProcess, QSettings, QSize, QUrl
 from PyQt6.QtGui import QIcon, QAction, QDesktopServices
 from .transaction import parse_simulation, SimulationError
@@ -11,6 +12,8 @@ from .i18n import tr
 from . import __version__
 
 HELPER = '/usr/lib/jatayu-update-manager/privileged-helper'
+APP_ICON_PATH = Path('/usr/share/icons/hicolor/scalable/apps/jatayu-update-manager.svg')
+DESKTOP_FILE_ID = 'in.jatayuos.update-manager'
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -38,7 +41,13 @@ class MainWindow(QMainWindow):
         return frame
 
     def resolve_app_icon(self):
-        # Match Icon=system-software-update in the desktop launcher.
+        # Bundle a stable identity for KDE launcher, task manager and dialogs.
+        # The generic theme icon is only a fallback if the package asset
+        # is unavailable (e.g. when running from an unpacked source tree).
+        if APP_ICON_PATH.is_file():
+            icon = QIcon(str(APP_ICON_PATH))
+            if not icon.isNull():
+                return icon
         for name in ('system-software-update', 'software-update-available',
                      'update-none', 'preferences-system'):
             icon = QIcon.fromTheme(name)
@@ -590,8 +599,13 @@ class MainWindow(QMainWindow):
 
 def main():
     app = QApplication(sys.argv)
-    app.setApplicationName('Jatayu Update Manager')
+    # Match the desktop file ID for Wayland task managers (KDE Plasma 6).
+    app.setDesktopFileName(DESKTOP_FILE_ID)
+    # Keep X11 WM_CLASS stable while presenting a human-readable app name.
+    app.setApplicationName('jatayu-update-manager')
+    app.setApplicationDisplayName('Jatayu Update Manager')
     window = MainWindow()
+    app.setWindowIcon(window.resolve_app_icon())
     window.show()
     return app.exec()
 

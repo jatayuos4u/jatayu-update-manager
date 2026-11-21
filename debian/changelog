@@ -4,6 +4,8 @@ jatayu-update-manager (1.2.2~rc1-1) unstable; urgency=medium
   * Add a one-click focused list mode, preserving update functionality.
   * Show full package versions in table tooltips.
   * Keep English and Hindi translations.
+  * Ship a dedicated scalable orange icon for KDE launcher, taskbar and window.
+  * Set the matching Qt desktop file identity for Plasma 6.
 
  -- JatayuOS Team <maintainers@jatayuos.in>  Sat, 21 Nov 2026 19:45:00 +0530
 

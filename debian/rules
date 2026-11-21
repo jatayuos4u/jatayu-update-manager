@@ -16,3 +16,5 @@ override_dh_auto_install:
 	install -m 644 polkit/in.jatayuos.update-manager.policy debian/jatayu-update-manager/usr/share/polkit-1/actions/
 	install -d debian/jatayu-update-manager/usr/share/applications
 	install -m 644 assets/in.jatayuos.update-manager.desktop debian/jatayu-update-manager/usr/share/applications/
+	install -d debian/jatayu-update-manager/usr/share/icons/hicolor/scalable/apps
+	install -m 644 assets/jatayu-update-manager.svg debian/jatayu-update-manager/usr/share/icons/hicolor/scalable/apps/jatayu-update-manager.svg

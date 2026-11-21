@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <title>Jatayu Update Manager</title>
+  <desc>Golden and orange circular update arrows surrounding a package symbol</desc>
+  <!-- Designed as a scalable, transparent recreation of the approved orange logo. -->
+  <g fill="none" stroke-width="18" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M 43 103 A 87 87 0 0 1 214 142" stroke="#FFC83D"/>
+    <path d="M 213 153 A 87 87 0 0 1 43 112" stroke="#FF9D2D"/>
+  </g>
+  <path d="M 34 58 Q 35 54 40 57 L 90 102 Q 94 107 88 107 L 40 107 Q 34 107 34 100 Z" fill="#FFC83D"/>
+  <path d="M 222 197 Q 221 203 215 199 L 166 157 Q 162 152 169 152 L 216 152 Q 222 152 222 158 Z" fill="#FF9D2D"/>
+  <rect x="81" y="109" width="94" height="35" rx="17.5" fill="none" stroke="#FFA62A" stroke-width="12"/>
+  <rect x="99" y="124" width="36" height="6" rx="3" fill="#FFCB41"/>
+  <rect x="140" y="124" width="17" height="6" rx="3" fill="#FF9D2D"/>
+</svg>
