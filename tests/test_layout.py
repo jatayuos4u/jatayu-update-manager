@@ -51,3 +51,17 @@ class UpdateListLayoutTests(unittest.TestCase):
         self.assertEqual(self.window.list_focus_button.text(), 'अपडेट सूची बड़ी करें')
         self.window.list_focus_button.setChecked(True)
         self.assertEqual(self.window.list_focus_button.text(), 'डैशबोर्ड दिखाएँ')
+
+    def test_about_dialog_shows_creator_and_version(self):
+        dialog = self.window.build_about_dialog()
+        labels = dialog.findChildren(__import__('PyQt6.QtWidgets', fromlist=['QLabel']).QLabel)
+        visible_text = ' '.join(label.text() for label in labels)
+        self.assertIn('Anup Kumar Yadav', visible_text)
+        self.assertIn('1.2.2', visible_text)
+        dialog.close()
+
+    def test_about_menu_localizes(self):
+        self.assertEqual(self.window.about_action.text(), 'About')
+        self.window.lang = 'hi'
+        self.window.translate_ui()
+        self.assertEqual(self.window.about_action.text(), 'परिचय')
