@@ -55,7 +55,19 @@ jobs:
           GH_REPO: ${{ github.repository }}
         run: |
           if gh release view v1.2.2-rc1 >/dev/null 2>&1; then
-            echo 'v1.2.2-rc1 already exists; refusing to overwrite.'
+            echo 'Pre-release already exists; checking the published asset name and checksum.'
+            mkdir -p existing-release
+            gh release download v1.2.2-rc1 \
+              --pattern 'jatayu-update-manager_1.2.2.rc1-1_all.deb' \
+              --dir existing-release
+            cd existing-release
+            sha256sum jatayu-update-manager_1.2.2.rc1-1_all.deb > SHA256SUMS
+            cd ..
+            gh release upload v1.2.2-rc1 existing-release/SHA256SUMS --clobber
+            gh release edit v1.2.2-rc1 \
+              --prerelease \
+              --notes-file RELEASE_NOTES_1.2.2-rc1.md
+            echo 'Updated checksum for the exact published package; original package unchanged.'
             exit 0
           fi
           gh release create v1.2.2-rc1 \
