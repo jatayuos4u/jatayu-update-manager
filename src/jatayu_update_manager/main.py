@@ -5,7 +5,7 @@ from PyQt6.QtGui import QIcon
 from .transaction import parse_simulation, SimulationError
 from PyQt6.QtWidgets import (QApplication, QComboBox, QFrame, QHBoxLayout, QLabel,
     QMainWindow, QMessageBox, QPushButton, QProgressBar, QTabWidget, QTableWidget,
-    QTableWidgetItem, QTextEdit, QVBoxLayout, QWidget, QHeaderView, QAbstractItemView, QStackedWidget, QLineEdit, QStyle)
+    QTableWidgetItem, QTextEdit, QVBoxLayout, QWidget, QHeaderView, QAbstractItemView, QStackedWidget, QLineEdit, QStyle, QSizePolicy)
 from .core import available_updates, recent_history
 from .i18n import tr
 
@@ -23,6 +23,7 @@ class MainWindow(QMainWindow):
         self.process = None
         self.operation = None
         self.preview_output = bytearray()
+        self.list_expanded = False
         self.build_ui()
         self.load_updates()
 
@@ -51,14 +52,14 @@ class MainWindow(QMainWindow):
         self.brand_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
     def build_ui(self):
-        self.setMinimumSize(850, 660)
-        self.resize(990, 730)
+        self.setMinimumSize(800, 620)
+        self.resize(1120, 820)
         root = QWidget()
         root.setObjectName('root')
         self.setCentralWidget(root)
         outer = QVBoxLayout(root)
-        outer.setContentsMargins(26, 22, 26, 20)
-        outer.setSpacing(17)
+        outer.setContentsMargins(22, 14, 22, 14)
+        outer.setSpacing(10)
 
         header = QHBoxLayout()
         self.brand_label = QLabel()
@@ -84,10 +85,18 @@ class MainWindow(QMainWindow):
         header.addWidget(self.language_box)
         outer.addLayout(header)
 
+        # Keep status and summary cards together so the user can expand the
+        # update list without losing the toolbar or package controls.
+        self.summary_panel = QWidget()
+        self.summary_panel.setObjectName('summaryPanel')
+        summary_layout = QVBoxLayout(self.summary_panel)
+        summary_layout.setContentsMargins(0, 0, 0, 0)
+        summary_layout.setSpacing(9)
+
         status_card = self.card('hero')
         hero_layout = QVBoxLayout(status_card)
-        hero_layout.setContentsMargins(22, 20, 22, 20)
-        hero_layout.setSpacing(11)
+        hero_layout.setContentsMargins(18, 10, 18, 10)
+        hero_layout.setSpacing(4)
         hero_row = QHBoxLayout()
         self.hero_icon = QLabel('◉')
         self.hero_icon.setObjectName('heroIcon')
@@ -112,17 +121,17 @@ class MainWindow(QMainWindow):
         self.platform = QLabel('Debian 13 Trixie  •  APT  •  KDE Plasma')
         self.platform.setObjectName('muted')
         hero_layout.addWidget(self.platform)
-        outer.addWidget(status_card)
+        summary_layout.addWidget(status_card)
 
         metrics = QHBoxLayout()
-        metrics.setSpacing(12)
+        metrics.setSpacing(10)
         self.metric_titles = []
         self.metric_values = []
         for icon in ('▣', '◷', '⬡'):
             card = self.card()
             lay = QVBoxLayout(card)
-            lay.setContentsMargins(18, 14, 18, 14)
-            lay.setSpacing(5)
+            lay.setContentsMargins(15, 8, 15, 8)
+            lay.setSpacing(2)
             small = QLabel(icon)
             small.setObjectName('metricIcon')
             value = QLabel('—')
@@ -135,7 +144,8 @@ class MainWindow(QMainWindow):
             metrics.addWidget(card, 1)
             self.metric_titles.append(title)
             self.metric_values.append(value)
-        outer.addLayout(metrics)
+        summary_layout.addLayout(metrics)
+        outer.addWidget(self.summary_panel, 0)
 
         self.tabs = QTabWidget()
         self.table = QTableWidget(0, 3)
@@ -145,6 +155,8 @@ class MainWindow(QMainWindow):
         self.table.verticalHeader().hide()
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.table.setShowGrid(False)
+        self.table.verticalHeader().setDefaultSectionSize(32)
+        self.table.setTextElideMode(Qt.TextElideMode.ElideMiddle)
         self.updates_page = QWidget()
         page_layout = QVBoxLayout(self.updates_page)
         page_layout.setContentsMargins(0, 0, 0, 0)
@@ -174,7 +186,8 @@ class MainWindow(QMainWindow):
         self.search.setClearButtonEnabled(True)
         self.search.textChanged.connect(self.filter_updates)
         list_layout.addWidget(self.search)
-        list_layout.addWidget(self.table)
+        self.table.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        list_layout.addWidget(self.table, 1)
         self.update_stack.addWidget(self.list_panel)
         page_layout.addWidget(self.update_stack)
         self.tabs.addTab(self.updates_page, '')
@@ -185,6 +198,8 @@ class MainWindow(QMainWindow):
         self.log.setReadOnly(True)
         self.log.setObjectName('log')
         self.tabs.addTab(self.log, '')
+        self.tabs.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        self.tabs.setMinimumHeight(240)
         outer.addWidget(self.tabs, 1)
 
         buttons = QHBoxLayout()
@@ -196,9 +211,15 @@ class MainWindow(QMainWindow):
         self.install_button = QPushButton()
         self.install_button.setMinimumHeight(44)
         self.install_button.clicked.connect(self.confirm_install)
+        self.list_focus_button = QPushButton()
+        self.list_focus_button.setObjectName('focusButton')
+        self.list_focus_button.setMinimumHeight(40)
+        self.list_focus_button.setCheckable(True)
+        self.list_focus_button.toggled.connect(self.toggle_list_focus)
         buttons.addWidget(self.check_button)
         buttons.addWidget(self.install_button)
         buttons.addStretch()
+        buttons.addWidget(self.list_focus_button)
         outer.addLayout(buttons)
         self.note = QLabel()
         self.note.setObjectName('muted')
@@ -220,12 +241,12 @@ class MainWindow(QMainWindow):
             QWidget#root {{ background: {base}; color: {fg}; font-size: 13px; }}
             QLabel {{ color: {fg}; background: transparent; }}
             QLabel#heading {{ font-size: 23px; font-weight: 700; }}
-            QLabel#heroTitle {{ font-size: 18px; font-weight: 700; }}
+            QLabel#heroTitle {{ font-size: 17px; font-weight: 700; }}
             QLabel#muted {{ color: {muted}; }}
             QLabel#brand {{ background: transparent; border: none; }}
             QLabel#heroIcon {{ color: {accent}; font-size: 31px; padding-right: 12px; }}
             QLabel#metricIcon {{ color: {accent}; font-size: 17px; }}
-            QLabel#metricValue {{ font-size: 27px; font-weight: 700; }}
+            QLabel#metricValue {{ font-size: 23px; font-weight: 700; }}
             QFrame#card, QFrame#hero {{ background: {card}; border: 1px solid {border}; border-radius: 13px; }}
             QFrame#hero {{ background: {hero}; }}
             QPushButton {{ background: {card}; border: 1px solid {border}; border-radius: 8px; padding: 9px 18px; color: {fg}; font-weight: 600; }}
@@ -255,6 +276,7 @@ class MainWindow(QMainWindow):
         self.hero_title.setText(self.t('system_status'))
         self.check_button.setText('↻  ' + self.t('check'))
         self.install_button.setText('↓  ' + self.t('install'))
+        self.list_focus_button.setText(self.t('show_dashboard') if self.list_expanded else self.t('expand_updates'))
         for i, key in enumerate(('name', 'current', 'new')):
             self.table.setHorizontalHeaderItem(i, QTableWidgetItem(self.t(key)))
         for i, key in enumerate(('updates', 'history', 'log')):
@@ -270,6 +292,13 @@ class MainWindow(QMainWindow):
         self.refresh_empty_state()
         self.check_button.setEnabled(not self.busy)
         self.install_button.setEnabled(self.checked and self.table.rowCount() > 0 and not self.busy)
+
+    def toggle_list_focus(self, expanded):
+        self.list_expanded = expanded
+        self.summary_panel.setVisible(not expanded)
+        if expanded:
+            self.tabs.setCurrentIndex(0)
+        self.list_focus_button.setText(self.t('show_dashboard') if expanded else self.t('expand_updates'))
 
     def change_language(self):
         self.lang = self.language_box.currentData()
@@ -289,7 +318,9 @@ class MainWindow(QMainWindow):
         self.table.setRowCount(len(updates))
         for row, values in enumerate(updates):
             for col, value in enumerate(values):
-                self.table.setItem(row, col, QTableWidgetItem(value))
+                item = QTableWidgetItem(value)
+                item.setToolTip(value)
+                self.table.setItem(row, col, item)
         self.metric_values[0].setText(str(len(updates)) if self.checked else '—')
         self.history.setPlainText(recent_history())
         self.refresh_empty_state()
