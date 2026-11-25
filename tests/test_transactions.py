@@ -67,3 +67,16 @@ class PrivilegeTests(unittest.TestCase):
             self.assertIn('--no-remove', cmd)
             self.assertEqual(runner.call_args.kwargs.get('cwd'), '/')
             self.assertEqual(runner.call_args.kwargs.get('env'), helper.ENV)
+
+    def test_oversized_output_is_rejected(self):
+        with self.assertRaises(SimulationError):
+            parse_simulation('A' * 1_000_001 + '\\nInst foo [1] (2 Debian)')
+
+    def test_refresh_fails_on_partial_repository_fetch(self):
+        helper = load_helper()
+        with patch.object(helper.os, 'geteuid', return_value=0), \
+             patch.object(helper.subprocess, 'run', return_value=Mock(returncode=0)) as runner:
+            self.assertEqual(helper.main(['refresh']), 0)
+            cmd = runner.call_args.args[0]
+            self.assertIn('APT::Update::Error-Mode=any', cmd)
+            self.assertEqual(runner.call_args.kwargs['env'], helper.ENV)

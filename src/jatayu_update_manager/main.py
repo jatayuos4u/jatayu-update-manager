@@ -27,6 +27,7 @@ class MainWindow(QMainWindow):
         self.process = None
         self.operation = None
         self.preview_output = bytearray()
+        self.preview_too_large = False
         self.list_expanded = False
         self.build_ui()
         self.load_updates()
@@ -225,6 +226,7 @@ class MainWindow(QMainWindow):
         self.tabs.addTab(self.history, '')
         self.log = QTextEdit()
         self.log.setReadOnly(True)
+        self.log.document().setMaximumBlockCount(5000)
         self.log.setObjectName('log')
         self.tabs.addTab(self.log, '')
         self.tabs.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
@@ -457,6 +459,7 @@ class MainWindow(QMainWindow):
         self.busy = True
         self.operation = 'preview'
         self.preview_output = bytearray()
+        self.preview_too_large = False
         self.check_button.setEnabled(False)
         self.install_button.setEnabled(False)
         self.status.setText(self.t('previewing'))
@@ -478,7 +481,7 @@ class MainWindow(QMainWindow):
         self.operation = None
         self.busy = False
         self.progress.hide()
-        if code != 0 or status != QProcess.ExitStatus.NormalExit:
+        if self.preview_too_large or code != 0 or status != QProcess.ExitStatus.NormalExit:
             self.checked = False
             self.last_error = self.t('preview_failed')
             self.log.setPlainText(output)
@@ -547,7 +550,14 @@ class MainWindow(QMainWindow):
             return
         raw = bytes(self.process.readAllStandardOutput())
         if self.operation == 'preview':
-            self.preview_output.extend(raw)
+            if len(self.preview_output) + len(raw) > 1_000_000:
+                self.preview_too_large = True
+                self.preview_output.clear()
+                # Only terminate the non-privileged simulation; never kill an
+                # active privileged APT installation.
+                self.process.kill()
+            else:
+                self.preview_output.extend(raw)
             return
         data = raw.decode('utf-8', errors='replace')
         self.log.moveCursor(self.log.textCursor().MoveOperation.End)
