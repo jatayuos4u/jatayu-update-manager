@@ -25,7 +25,7 @@ def main(argv=None):
         print('Administrator authorization required.', file=sys.stderr)
         return 1
     if args == ['refresh']:
-        command = [APT, 'update', '-o', 'Dpkg::Use-Pty=0']
+        command = [APT, 'update', '-o', 'APT::Update::Error-Mode=any', '-o', 'Dpkg::Use-Pty=0']
     elif len(args) == 2 and args[0] == 'upgrade' and re.fullmatch(r'[a-f0-9]{64}', args[1]):
         try:
             current = preview()

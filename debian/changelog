@@ -1,3 +1,12 @@
+jatayu-update-manager (1.2.2~rc2-1) unstable; urgency=medium
+
+  * Treat partially failed APT repository refreshes as errors.
+  * Bound untrusted APT simulation and on-screen log output.
+  * Retain the existing confirmed KDE interface and update preview.
+  * Document remaining crash-recovery and release provenance risks.
+
+ -- JatayuOS Team <maintainers@jatayuos.in>  Wed, 25 Nov 2026 10:00:00 +0530
+
 jatayu-update-manager (1.2.2~rc1-1) unstable; urgency=medium
 
   * Expand available-updates table with a compact dashboard layout.

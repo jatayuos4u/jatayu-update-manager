@@ -17,6 +17,10 @@ class Simulation:
 def parse_simulation(output: str) -> Simulation:
     if not isinstance(output, str):
         raise SimulationError('Invalid APT simulation output')
+    # Bound untrusted command output before constructing a potentially large
+    # parsed transaction plan.
+    if len(output) > 1_000_000:
+        raise SimulationError('APT simulation output exceeds limits.')
     installs, removals, plan = [], [], []
     for line in output.splitlines():
         if line.startswith(('Inst ', 'Remv ', 'Conf ')):
@@ -29,7 +33,7 @@ def parse_simulation(output: str) -> Simulation:
         raise SimulationError('APT simulation proposed package removals; operation blocked.')
     if not installs:
         raise SimulationError('No package installations/upgrades proposed; operation blocked.')
-    if len(output) > 1_000_000 or len(plan) > 10_000:
+    if len(plan) > 10_000:
         raise SimulationError('APT simulation output exceeds limits.')
     digest = hashlib.sha256(('\n'.join(plan) + '\n').encode('utf-8')).hexdigest()
     return Simulation(tuple(installs), digest)
