@@ -1,20 +1,20 @@
 # Jatayu Update Manager
 
-[![Release](https://img.shields.io/badge/release-v1.2.2--rc1-orange)](https://github.com/jatayuos4u/jatayu-update-manager/releases/tag/v1.2.2-rc1)
+[![Release](https://img.shields.io/badge/release-v1.2.2--rc2-orange)](https://github.com/jatayuos4u/jatayu-update-manager/releases/tag/v1.2.2-rc2)
 [![Debian](https://img.shields.io/badge/Debian-13%20Trixie-blue)](https://www.debian.org/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 **Jatayu Update Manager 1.2.2** is a PyQt6 graphical APT update manager for [JatayuOS](https://jatayuos.in), based on Debian 13 Trixie and KDE Plasma.
 
 > [!WARNING]
-> **Pre-release / Testing (v1.2.2-rc1):** Not yet approved for production systems or inclusion in the stable JatayuOS ISO. Real package upgrades, Polkit cancellation, offline errors, and APT lock handling need further testing. Try it on a disposable VM or backed-up test system.
+> **Pre-release / Testing (v1.2.2-rc2):** Not yet approved for production systems or inclusion in the stable JatayuOS ISO. The app still requires independent transaction supervision and concurrent APT/dpkg integration tests; see SECURITY_AUDIT_2026-11-25.md. Try it on a disposable VM or backed-up test system.
 
 ## Download Jatayu Update Manager
 
-**[⬇ Download Jatayu Update Manager 1.2.2 RC1 (.deb)](https://github.com/jatayuos4u/jatayu-update-manager/releases/download/v1.2.2-rc1/jatayu-update-manager_1.2.2.rc1-1_all.deb)**
+**[⬇ Download Jatayu Update Manager 1.2.2 RC2 (.deb)](https://github.com/jatayuos4u/jatayu-update-manager/releases/download/v1.2.2-rc2/jatayu-update-manager_1.2.2.rc2-1_all.deb)**
 
-- [View the official GitHub release and notes](https://github.com/jatayuos4u/jatayu-update-manager/releases/tag/v1.2.2-rc1)
-- [Download SHA-256 checksums](https://github.com/jatayuos4u/jatayu-update-manager/releases/download/v1.2.2-rc1/SHA256SUMS)
+- [View the official GitHub release and notes](https://github.com/jatayuos4u/jatayu-update-manager/releases/tag/v1.2.2-rc2)
+- [Download SHA-256 checksums](https://github.com/jatayuos4u/jatayu-update-manager/releases/download/v1.2.2-rc2/SHA256SUMS)
 - [See all releases](https://github.com/jatayuos4u/jatayu-update-manager/releases)
 
 ### Install the downloaded package
@@ -22,11 +22,15 @@
 Open Konsole in the folder containing the downloaded `.deb` file, then run:
 
 ```bash
-sudo apt install ./jatayu-update-manager_1.2.2.rc1-1_all.deb
+sudo apt install ./jatayu-update-manager_1.2.2.rc2-1_all.deb
 jatayu-update-manager
 ```
 
 To verify the downloaded file, place `SHA256SUMS` alongside the `.deb` and run `sha256sum -c SHA256SUMS` before installation.
+
+## Final security review
+
+See [25 November 2026 security audit](SECURITY_AUDIT_2026-11-25.md). **RC2 is still a pre-release**: crash-safe transaction supervision and concurrent package-manager tests are release blockers. Do not ship as stable or bundle in the public ISO yet.
 
 ## Features
 
@@ -52,7 +56,7 @@ sudo apt install --no-install-recommends build-essential debhelper dh-python dpk
 dpkg-buildpackage -us -uc -b
 ```
 
-The package is written to the parent directory, e.g. `../jatayu-update-manager_1.2.2.rc1-1_all.deb`.
+The package is written to the parent directory, e.g. `../jatayu-update-manager_1.2.2.rc2-1_all.deb`.
 
 ## Test and run from source
 
