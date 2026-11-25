@@ -1,0 +1,67 @@
+name: Publish Jatayu Update Manager 1.2.2 RC2
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/publish-1.2.2-rc2.yml
+
+permissions:
+  contents: write
+
+jobs:
+  release-candidate:
+    runs-on: ubuntu-latest
+    container:
+      image: debian:trixie
+    steps:
+      - name: Install test and release tooling
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends ca-certificates git gh python3 python3-apt python3-pyqt6 build-essential debhelper dh-python dpkg-dev pkexec polkitd libxml2-utils python3-bandit
+      - name: Checkout source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Require correct release version
+        run: |
+          test "$GITHUB_REF" = "refs/heads/main"
+          grep -q '^jatayu-update-manager (1.2.2~rc2-1) ' debian/changelog
+          test -f SECURITY_AUDIT_2026-11-25.md
+      - name: Test source and policy
+        run: |
+          PYTHONPATH=src QT_QPA_PLATFORM=offscreen python3 -m unittest discover -s tests -v
+          python3 -m compileall -q src helper scripts
+          xmllint --noout polkit/in.jatayuos.update-manager.policy
+          xmllint --noout assets/jatayu-update-manager.svg
+          bandit -q -r src helper -s B404,B603,B607
+      - name: Build and inspect .deb package
+        run: |
+          dpkg-buildpackage -us -uc -b
+          dpkg-deb --info '../jatayu-update-manager_1.2.2~rc2-1_all.deb'
+          dpkg-deb --contents '../jatayu-update-manager_1.2.2~rc2-1_all.deb' | grep -F 'privileged-helper'
+          dpkg-deb --contents '../jatayu-update-manager_1.2.2~rc2-1_all.deb' | grep -F 'jatayu-update-manager.svg'
+      - name: Prepare exact release asset and matching checksum
+        run: |
+          mkdir -p release
+          cp '../jatayu-update-manager_1.2.2~rc2-1_all.deb' release/jatayu-update-manager_1.2.2.rc2-1_all.deb
+          cd release
+          sha256sum jatayu-update-manager_1.2.2.rc2-1_all.deb > SHA256SUMS
+          sha256sum -c SHA256SUMS
+      - name: Publish testing pre-release (do not overwrite)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          if gh release view v1.2.2-rc2 >/dev/null 2>&1; then
+            echo 'Release already exists. Not overwriting existing artifacts.'
+            exit 0
+          fi
+          gh release create v1.2.2-rc2 \
+            release/jatayu-update-manager_1.2.2.rc2-1_all.deb \
+            release/SHA256SUMS \
+            --target "$GITHUB_SHA" \
+            --prerelease \
+            --title 'Jatayu Update Manager 1.2.2 RC2' \
+            --notes-file RELEASE_NOTES_1.2.2-rc2.md
