@@ -1,3 +1,12 @@
+jatayu-update-manager (1.2.3~alpha1-1) unstable; urgency=medium
+
+  * Add conservative dpkg frontend lock preflight before privileged APT operations.
+  * Recheck frontend lock after the upgrade simulation, before execution.
+  * Add tests exercising genuine POSIX lock contention between processes.
+  * Begin the transaction backend redesign; no stable/crash-safe claims.
+
+ -- JatayuOS Team <maintainers@jatayuos.in>  Thu, 26 Nov 2026 19:45:00 +0530
+
 jatayu-update-manager (1.2.2~rc2-1) unstable; urgency=medium
 
   * Treat partially failed APT repository refreshes as errors.

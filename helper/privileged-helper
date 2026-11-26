@@ -1,5 +1,6 @@
 #!/usr/bin/python3
 """Polkit-protected APT actions. Only fixed commands; no shell interpretation."""
+import fcntl
 import os
 import re
 import subprocess
@@ -10,6 +11,26 @@ APT = '/usr/bin/apt-get'
 ENV = {'PATH': '/usr/sbin:/usr/bin:/sbin:/bin',
        'LANG': 'C.UTF-8', 'LC_ALL': 'C.UTF-8',
        'DEBIAN_FRONTEND': 'noninteractive', 'HOME': '/root'}
+
+# Debian APT/dpkg frontend advisory lock. Never delete or truncate lock files.
+FRONTEND_LOCK = '/var/lib/dpkg/lock-frontend'
+BUSY_EXIT = 5
+
+
+def frontend_available(lock_path=FRONTEND_LOCK):
+    """Fail closed when another dpkg frontend owns the advisory lock.
+
+    This is a *preflight guard*, not a durable lock held across the upgrade.
+    Holding it while invoking apt-get would deadlock with APT's own lock
+    acquisition. Atomic preview/commit still needs a supervised backend.
+    """
+    try:
+        with open(lock_path, 'r+b') as lock:
+            fcntl.lockf(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            fcntl.lockf(lock, fcntl.LOCK_UN)
+    except (OSError, PermissionError):
+        return False
+    return True
 
 def preview():
     command = [APT, '-s', '--no-remove', 'upgrade']
@@ -25,8 +46,14 @@ def main(argv=None):
         print('Administrator authorization required.', file=sys.stderr)
         return 1
     if args == ['refresh']:
+        if not frontend_available():
+            print('Another package manager is busy, or package lock is unavailable.', file=sys.stderr)
+            return BUSY_EXIT
         command = [APT, 'update', '-o', 'APT::Update::Error-Mode=any', '-o', 'Dpkg::Use-Pty=0']
     elif len(args) == 2 and args[0] == 'upgrade' and re.fullmatch(r'[a-f0-9]{64}', args[1]):
+        if not frontend_available():
+            print('Another package manager is busy, or package lock is unavailable.', file=sys.stderr)
+            return BUSY_EXIT
         try:
             current = preview()
         except (OSError, subprocess.TimeoutExpired, SimulationError) as exc:
@@ -35,6 +62,11 @@ def main(argv=None):
         if current.digest != args[1]:
             print('APT upgrade plan changed since confirmation. Refresh and review again.', file=sys.stderr)
             return 4
+        # Check again after the simulation, immediately before apt-get.
+        # This reduces contention windows but does not make the plan atomic.
+        if not frontend_available():
+            print('Package manager became busy. Retry after it finishes.', file=sys.stderr)
+            return BUSY_EXIT
         command = [APT, '-y', '--no-remove', 'upgrade',
                    '-o', 'Dpkg::Use-Pty=0',
                    '-o', 'Dpkg::Options::=--force-confold']
