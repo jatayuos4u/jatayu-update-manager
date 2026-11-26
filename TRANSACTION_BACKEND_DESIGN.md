@@ -21,3 +21,7 @@ The shipped 1.2.2 RC2 starts `pkexec privileged-helper` as a GUI-owned Qt proces
 7. Audit systemd unit sandboxing, Polkit identity checks, per-user authorization, status/log file permissions, resource limits, provenance and branch/tag protection.
 
 **Release gate:** Alpha1 improves busy-lock rejection only. **It does not solve GUI crash survival or the preview/execute race.** Do not ship as stable or enable it by default in the public JatayuOS ISO.
+
+## Stage A2 — supervised worker prototype
+
+A root-only, opt-in `systemd-run --system` launcher and standalone worker are included **without GUI integration**. The worker invokes the existing validated helper, emits a minimal atomic transaction status file under `/var/lib/jatayu-update-manager/transactions/`, and runs under a transient systemd unit rather than the GUI. This prototype does **not** yet implement recovery reconciliation, proper cross-service single-flight, full journal authentication, reliable active-state reporting or crash tests. No stable use is approved. The worker is shipped solely to support controlled root-only backend testing; do not expose the launcher via a desktop entry.

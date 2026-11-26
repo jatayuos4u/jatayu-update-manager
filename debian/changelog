@@ -1,3 +1,12 @@
+jatayu-update-manager (1.2.3~alpha2-1) unstable; urgency=medium
+
+  * Prototype opt-in systemd-supervised root transaction worker.
+  * Atomically persist minimal root-owned transaction status records.
+  * Add backend unit tests without switching over the existing GUI.
+  * Do not claim stable crash recovery or atomic APT plan execution.
+
+ -- JatayuOS Team <maintainers@jatayuos.in>  Thu, 26 Nov 2026 20:00:00 +0530
+
 jatayu-update-manager (1.2.3~alpha1-1) unstable; urgency=medium
 
   * Add conservative dpkg frontend lock preflight before privileged APT operations.
