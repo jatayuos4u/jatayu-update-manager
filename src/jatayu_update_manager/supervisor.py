@@ -69,9 +69,15 @@ def verify_production_state_parents(directory):
     if directory != STATE_DIR:
         return
     for component in reversed(list(directory.parents)):
-        verify_trusted_directory(component)
-    # The final directory may not exist on first launch; its already existing
-    # parent must be trusted before mkdir creates any state under it.
+        try:
+            verify_trusted_directory(component)
+        except FileNotFoundError:
+            # Fresh installs may lack /var/lib/jatayu-update-manager.
+            # All ancestors have already been validated in path order.
+            component.mkdir(mode=0o711)
+            verify_trusted_directory(component)
+    # The final directory may not exist on first launch; its parent has
+    # been validated or safely created under trusted ancestors.
 
 
 def prepare_state_directory(directory):
