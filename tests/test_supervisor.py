@@ -187,3 +187,17 @@ class SupervisorTests(unittest.TestCase):
                 self.assertEqual(s.verify_trusted_directory(rootdir), rootdir)
             else:
                 self.skipTest('Root-only ownership check')
+
+    def test_fresh_install_creates_trusted_state_parent(self):
+        if os.geteuid() != 0:
+            self.skipTest('Creating root-owned production-style state requires root')
+        with tempfile.TemporaryDirectory() as tmp:
+            parent = Path(tmp) / 'jatayu-update-manager'
+            target = parent / 'transactions'
+            self.assertFalse(parent.exists())
+            with patch.object(s, 'STATE_DIR', target):
+                result = s.prepare_state_directory(target)
+            self.assertEqual(result, target)
+            self.assertTrue(parent.is_dir())
+            self.assertEqual(parent.stat().st_uid, 0)
+            self.assertFalse(parent.stat().st_mode & 0o022)
