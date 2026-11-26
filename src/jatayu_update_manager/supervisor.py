@@ -276,7 +276,7 @@ def run_worker(identifier, action, digest, directory=STATE_DIR):
         except (OSError, RuntimeError):
             # Never overwrite the existing journal when a reused ID caused
             # refusal: preserving the original running record is critical.
-            if not status_path(identifier, directory).exists():
+            if not os.path.lexists(status_path(identifier, directory)):
                 write_status(identifier, action, 'failed', exit_code=UNRESOLVED_EXIT,
                              directory=directory)
             return UNRESOLVED_EXIT
