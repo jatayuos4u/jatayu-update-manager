@@ -5,7 +5,7 @@ Transaction IDs are locators, never authorization tokens.
 """
 import re
 
-_ID = re.compile(r'[0-9a-f]{32}\\Z')
+_ID = re.compile(r'[0-9a-f]{32}\Z')
 MAX_LAUNCH_OUTPUT = 4096
 
 
