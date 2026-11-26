@@ -202,7 +202,13 @@ def start_supervised(action, digest='-', owner_uid=None):
         command = [
             SYSTEMD_RUN, '--system', '--unit=' + unit, '--collect',
             '--property=Type=exec', '--property=User=root',
-            '--property=WorkingDirectory=/', '--',
+            '--property=WorkingDirectory=/',
+            # Keep helper descendants in the unit's lifecycle. If systemd
+            # stops a failed/aborted worker, it must not leave APT children
+            # detached outside service management.
+            '--property=KillMode=control-group',
+            '--property=SendSIGKILL=yes',
+            '--property=StandardInput=null', '--',
             WORKER, identifier, action, digest,
         ]
         # A system service is independent of the desktop's QProcess lifetime.

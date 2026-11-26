@@ -97,3 +97,7 @@ Before creating the fixed production transaction-status directory, the superviso
 ## Stage A20 — collected transient-unit status
 
 A `systemd-run --collect` unit can disappear after its worker exits. The status reader now accepts a `not-found` unit as inactive only when `systemctl show` explicitly reports `LoadState=not-found`, `ActiveState=inactive`, and a blank `ExecStart` (with exit status 0 or 1). An empty, malformed or otherwise failed query stays unknown, preventing premature handoff replacement. Active-unit checks also require the expected configured worker executable and argv prefix. Mocked tests cover both safe collected-unit reporting and ambiguous failures. **A real systemd/Polkit run is still required to validate exact output across the target Debian 13 systemd build; stable release remains blocked.**
+
+## Stage A21 — explicit systemd control-group cleanup policy
+
+The systemd transient launcher now explicitly sets `KillMode=control-group` and `SendSIGKILL=yes`, retaining APT helper descendants inside the systemd unit's stop lifecycle rather than leaving them orphaned if the main worker exits or the service is stopped. It also sets `StandardInput=null`. Mocked launcher tests enforce these flags and disallow process-only kill modes. **These flags do not make interrupted dpkg transactions safe or resumable** and must not be tested by terminating real APT on a workstation. VM-only service termination and package-repair validation remain required before stable release.

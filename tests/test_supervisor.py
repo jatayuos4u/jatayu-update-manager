@@ -67,6 +67,9 @@ class SupervisorTests(unittest.TestCase):
             self.assertEqual(command[0], '/usr/bin/systemd-run')
             self.assertIn('--system', command)
             self.assertIn(s.WORKER, command)
+            self.assertIn('--property=KillMode=control-group', command)
+            self.assertIn('--property=SendSIGKILL=yes', command)
+            self.assertIn('--property=StandardInput=null', command)
             self.assertEqual(command[-3:], [transaction, 'refresh', '-'])
             self.assertTrue(runner.call_args.kwargs['check'])
 
@@ -209,3 +212,16 @@ class SupervisorTests(unittest.TestCase):
             self.assertTrue(parent.is_dir())
             self.assertEqual(parent.stat().st_uid, 0)
             self.assertFalse(parent.stat().st_mode & 0o022)
+
+    def test_service_launch_cannot_use_process_kill_mode(self):
+        """Reject regressions that would orphan APT descendants on stop."""
+        from unittest.mock import Mock
+        with patch.object(s.os, 'geteuid', return_value=0), \
+             patch.object(s.subprocess, 'run', return_value=Mock(returncode=0)) as runner:
+            s.start_supervised('upgrade', 'a' * 64)
+        argv = runner.call_args.args[0]
+        self.assertNotIn('--property=KillMode=process', argv)
+        self.assertNotIn('--property=KillMode=none', argv)
+        self.assertEqual(argv.count('--property=KillMode=control-group'), 1)
+        self.assertIn('--property=SendSIGKILL=yes', argv)
+        self.assertEqual(argv[argv.index('--')+1], s.WORKER)
