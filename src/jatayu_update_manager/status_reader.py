@@ -13,8 +13,8 @@ import stat
 from .supervisor import STATE_DIR, boot_id, status_path
 
 MAX_STATUS_BYTES = 4096
-_ID = re.compile(r'[0-9a-f]{32}\\Z')
-_BOOT = re.compile(r'[0-9a-f-]{36}\\Z')
+_ID = re.compile(r'[0-9a-f]{32}\Z')
+_BOOT = re.compile(r'[0-9a-f-]{36}\Z')
 
 
 class InvalidStatus(ValueError):
