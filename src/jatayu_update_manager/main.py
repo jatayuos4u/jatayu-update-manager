@@ -6,7 +6,7 @@ from PyQt6.QtCore import Qt, QProcess, QSettings, QSize, QUrl, QTimer
 from PyQt6.QtGui import QIcon, QAction, QDesktopServices
 from .transaction import parse_simulation, SimulationError
 from .status_reader import read_status, reconcile_status, InvalidStatus
-from .supervised_protocol import parse_launcher_reply, MAX_LAUNCH_OUTPUT
+from .supervised_protocol import parse_launcher_reply, parse_recovery_reply, MAX_LAUNCH_OUTPUT
 # Recovery handoffs are deliberately root-only pending an authorized IPC API.
 from PyQt6.QtWidgets import (QApplication, QComboBox, QFrame, QHBoxLayout, QLabel,
     QMainWindow, QMessageBox, QPushButton, QProgressBar, QTabWidget, QTableWidget,
@@ -17,6 +17,7 @@ from . import __version__
 
 HELPER = '/usr/lib/jatayu-update-manager/privileged-helper'
 SUPERVISED_LAUNCHER = '/usr/lib/jatayu-update-manager/supervised-launcher'
+RECOVERY_LOOKUP = '/usr/lib/jatayu-update-manager/recovery-lookup'
 # Developer opt-in only; the published default update buttons are unchanged.
 EXPERIMENTAL_SUPERVISED = os.environ.get('JATAYU_UPDATE_MANAGER_EXPERIMENTAL') == '1'
 APP_ICON_PATH = Path('/usr/share/icons/hicolor/scalable/apps/jatayu-update-manager.svg')
@@ -37,6 +38,9 @@ class MainWindow(QMainWindow):
         self.preview_too_large = False
         self.list_expanded = False
         self.supervised_process = None
+        self.recovery_process = None
+        self.recovery_response = bytearray()
+        self.recovery_too_large = False
         self.supervised_response = bytearray()
         self.supervised_too_large = False
         self.supervised_timer = QTimer(self)
@@ -44,7 +48,7 @@ class MainWindow(QMainWindow):
         self.supervised_timer.timeout.connect(self.poll_supervised_status)
         self.build_ui()
         self.load_updates()
-        self.recover_supervised_handoff()
+        # Recovery requires explicit administrator authentication; never run at startup.
         if self.settings.value('supervised_transaction_id', ''):
             self.supervised_timer.start()
             self.poll_supervised_status()
@@ -127,6 +131,8 @@ class MainWindow(QMainWindow):
         self.transaction_status_action.triggered.connect(self.show_transaction_status)
         self.supervised_start_action = QAction(self)
         self.supervised_start_action.triggered.connect(self.start_supervised_refresh)
+        self.recovery_action = QAction(self)
+        self.recovery_action.triggered.connect(self.recover_supervised_handoff)
         self.about_action.triggered.connect(self.show_about)
         self.help_action.triggered.connect(self.show_help)
         self.issue_action.triggered.connect(self.open_issues)
@@ -135,6 +141,7 @@ class MainWindow(QMainWindow):
             self.app_menu.addAction(action)
         if EXPERIMENTAL_SUPERVISED:
             self.app_menu.addAction(self.supervised_start_action)
+            self.app_menu.addAction(self.recovery_action)
         header.addWidget(self.menu_button)
         outer.addLayout(header)
 
@@ -337,6 +344,7 @@ class MainWindow(QMainWindow):
                             (self.transaction_status_action, 'transaction_status')):
             action.setText(self.t(key))
         self.supervised_start_action.setText(self.t('supervised_start'))
+        self.recovery_action.setText(self.t('recover_previous_transaction'))
         self.title_label.setText(self.t('title'))
         self.subtitle_label.setText(self.t('subtitle'))
         self.hero_title.setText(self.t('system_status'))
@@ -398,13 +406,69 @@ class MainWindow(QMainWindow):
         return dialog
 
     def recover_supervised_handoff(self):
-        """Fail closed: no direct GUI access to root-owned recovery handoffs.
+        """Developer-only, explicit, Polkit-authorized recovery of own handoff.
 
-        The GUI can retain a transaction ID already returned by pkexec, but
-        must not bypass user isolation by inspecting root-owned UID records.
-        An authenticated read-only service is needed for lost-ID recovery.
+        Never read a root-owned file directly or start packages here.
         """
-        return
+        if not EXPERIMENTAL_SUPERVISED or self.recovery_process is not None:
+            return
+        if self.supervised_process is not None or self.busy:
+            return
+        if self.settings.value('supervised_transaction_id', ''):
+            QMessageBox.information(self, self.t('transaction_status'),
+                                    self.supervised_status_text())
+            return
+        if QMessageBox.question(
+                self, self.t('recover_previous_transaction'),
+                self.t('recovery_auth_warning'),
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No) != QMessageBox.StandardButton.Yes:
+            return
+        self.recovery_response.clear()
+        self.recovery_too_large = False
+        process = QProcess(self)
+        self.recovery_process = process
+        process.setProcessChannelMode(QProcess.ProcessChannelMode.MergedChannels)
+        process.readyReadStandardOutput.connect(self.read_recovery_reply)
+        process.finished.connect(self.recovery_finished)
+        process.errorOccurred.connect(self.recovery_error)
+        process.start('/usr/bin/pkexec', [RECOVERY_LOOKUP])
+
+    def read_recovery_reply(self):
+        if self.recovery_process is None:
+            return
+        block = bytes(self.recovery_process.readAllStandardOutput())
+        if len(self.recovery_response) + len(block) > MAX_LAUNCH_OUTPUT:
+            self.recovery_too_large = True
+            self.recovery_response.clear()
+            return
+        if not self.recovery_too_large:
+            self.recovery_response.extend(block)
+
+    def recovery_error(self, error):
+        if error == QProcess.ProcessError.FailedToStart:
+            self.recovery_process = None
+            self.recovery_response.clear()
+            QMessageBox.warning(self, self.t('error'), self.t('recovery_failed'))
+
+    def recovery_finished(self, code, status):
+        if self.recovery_process is None:
+            return
+        self.read_recovery_reply()
+        self.recovery_process = None
+        try:
+            if self.recovery_too_large or status != QProcess.ExitStatus.NormalExit:
+                raise ValueError('Untrusted recovery response')
+            identifier = parse_recovery_reply(self.recovery_response, code)
+        except ValueError:
+            QMessageBox.warning(self, self.t('error'), self.t('recovery_failed'))
+            return
+        self.settings.setValue('supervised_transaction_id', identifier)
+        self.settings.sync()
+        self.supervised_timer.start()
+        self.poll_supervised_status()
+        QMessageBox.information(self, self.t('transaction_status'),
+                                self.supervised_status_text())
 
     def start_supervised_refresh(self):
         """Opt-in developer-only refresh; not connected to normal update controls."""

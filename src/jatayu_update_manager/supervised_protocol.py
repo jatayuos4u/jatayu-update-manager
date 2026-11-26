@@ -25,3 +25,21 @@ def parse_launcher_reply(output, exit_code):
     if not _ID.fullmatch(identifier):
         raise ValueError('Invalid supervised transaction ID')
     return identifier
+
+
+def parse_recovery_reply(output, exit_code):
+    """Parse one exact recovery ID; never treat lookup as transaction success."""
+    if exit_code != 0 or not isinstance(output, (bytes, bytearray)):
+        raise ValueError('Recovery lookup failed')
+    if len(output) > MAX_LAUNCH_OUTPUT:
+        raise ValueError('Recovery response too large')
+    try:
+        response = bytes(output).decode('ascii')
+    except UnicodeDecodeError as exc:
+        raise ValueError('Invalid recovery encoding') from exc
+    if not response.startswith('RECOVERY_ID=') or response.count('\n') != 1 or not response.endswith('\n'):
+        raise ValueError('Invalid recovery response')
+    identifier = response[len('RECOVERY_ID='):-1]
+    if not _ID.fullmatch(identifier):
+        raise ValueError('Invalid recovery transaction ID')
+    return identifier

@@ -167,3 +167,21 @@ class UpdateListLayoutTests(unittest.TestCase):
                 reopened.supervised_timer.stop()
                 reopened.close()
 
+
+    def test_recovery_does_not_run_automatically_on_startup(self):
+        from jatayu_update_manager.main import MainWindow
+        with patch('jatayu_update_manager.main.EXPERIMENTAL_SUPERVISED', True), \
+             patch('jatayu_update_manager.main.QProcess.start') as start:
+            reopened = MainWindow()
+            try:
+                start.assert_not_called()
+            finally:
+                reopened.close()
+                reopened.supervised_timer.stop()
+
+    def test_recovery_is_disabled_without_developer_flag(self):
+        from unittest.mock import patch
+        with patch('jatayu_update_manager.main.EXPERIMENTAL_SUPERVISED', False), \
+             patch('jatayu_update_manager.main.QMessageBox.question') as question:
+            self.window.recover_supervised_handoff()
+            question.assert_not_called()

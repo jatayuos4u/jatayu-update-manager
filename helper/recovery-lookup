@@ -1,0 +1,36 @@
+#!/usr/bin/python3
+"""Dedicated root-only, read-only recovery lookup bound to its own Polkit action.
+
+The caller cannot supply a UID, transaction ID or path. PKEXEC_UID is the
+authenticated original requester identity supplied by pkexec.
+"""
+import os
+import sys
+from jatayu_update_manager.handoff import read_handoff
+
+
+def main(argv=None):
+    args = sys.argv[1:] if argv is None else argv
+    if args:
+        print('Recovery lookup does not accept arguments.', file=sys.stderr)
+        return 2
+    if os.geteuid() != 0:
+        print('Administrator authentication required.', file=sys.stderr)
+        return 1
+    uid_text = os.environ.get('PKEXEC_UID', '')
+    if not uid_text or not uid_text.isascii() or not uid_text.isdecimal():
+        print('Missing caller identity.', file=sys.stderr)
+        return 3
+    try:
+        uid = int(uid_text)
+        record = read_handoff(uid)
+    except (OSError, ValueError, PermissionError):
+        # Refuse to disclose other accounts or distinguish nonexistent records.
+        print('Recovery locator unavailable.', file=sys.stderr)
+        return 3
+    print('RECOVERY_ID=' + record['id'], flush=True)
+    return 0
+
+
+if __name__ == '__main__':
+    sys.exit(main())

@@ -1,3 +1,13 @@
+jatayu-update-manager (1.2.3~alpha14-1) unstable; urgency=medium
+
+  * Introduce explicit Polkit-authenticated read-only lost-ID recovery.
+  * Restrict lookup to pkexec caller UID without accepting path/UID arguments.
+  * Keep private 0600 handoff files and avoid startup authorization prompts.
+  * Verify bounded recovery reply and preserve normal APT workflow.
+  * Add bilingual developer-only action and regression tests.
+
+ -- JatayuOS Team <maintainers@jatayuos.in>  Thu, 26 Nov 2026 22:35:00 +0530
+
 jatayu-update-manager (1.2.3~alpha13-1) unstable; urgency=medium
 
   * Restrict root-owned per-user handoff recovery records to mode 0600.
