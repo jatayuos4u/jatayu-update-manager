@@ -242,7 +242,7 @@ def ensure_no_unresolved_transactions(directory=STATE_DIR):
     with os.scandir(directory) as entries:
         for entry in entries:
             name = entry.name
-            if not name.endswith('.json'):
+            if not name.endswith('.json') or name.startswith('handoff-'):
                 continue
             count += 1
             if count > MAX_TRANSACTION_RECORDS:
@@ -274,8 +274,11 @@ def run_worker(identifier, action, digest, directory=STATE_DIR):
         try:
             ensure_no_unresolved_transactions(directory)
         except (OSError, RuntimeError):
-            write_status(identifier, action, 'failed', exit_code=UNRESOLVED_EXIT,
-                         directory=directory)
+            # Never overwrite the existing journal when a reused ID caused
+            # refusal: preserving the original running record is critical.
+            if not status_path(identifier, directory).exists():
+                write_status(identifier, action, 'failed', exit_code=UNRESOLVED_EXIT,
+                             directory=directory)
             return UNRESOLVED_EXIT
         write_status(identifier, action, 'running', directory=directory)
         cmd = [HELPER, action] + ([digest] if action == 'upgrade' else [])
