@@ -112,3 +112,33 @@ class UpdateListLayoutTests(unittest.TestCase):
         self.window.lang = 'hi'
         self.window.translate_ui()
         self.assertIn('लेन-देन', self.window.transaction_status_action.text())
+
+    def test_existing_transaction_recovers_tracking_at_startup(self):
+        from unittest.mock import patch
+        from jatayu_update_manager.main import MainWindow
+        self.window.settings.setValue('supervised_transaction_id', 'a' * 32)
+        self.window.settings.sync()
+        with patch('jatayu_update_manager.main.read_status',
+                   side_effect=FileNotFoundError):
+            recovered = MainWindow()
+            try:
+                self.assertTrue(recovered.supervised_timer.isActive())
+                self.assertEqual(recovered.settings.value('supervised_transaction_id'), 'a' * 32)
+            finally:
+                recovered.close()
+                recovered.supervised_timer.stop()
+        self.window.settings.remove('supervised_transaction_id')
+
+    def test_status_menu_never_starts_apt(self):
+        from unittest.mock import patch
+        with patch('jatayu_update_manager.main.QMessageBox.information'), \
+             patch.object(self.window, 'start_supervised_refresh') as launcher:
+            self.window.show_transaction_status()
+            launcher.assert_not_called()
+
+    def test_experimental_start_is_disabled_without_opt_in(self):
+        from unittest.mock import patch
+        with patch('jatayu_update_manager.main.EXPERIMENTAL_SUPERVISED', False), \
+             patch('jatayu_update_manager.main.QMessageBox.question') as question:
+            self.window.start_supervised_refresh()
+            question.assert_not_called()

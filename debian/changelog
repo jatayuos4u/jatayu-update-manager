@@ -1,3 +1,13 @@
+jatayu-update-manager (1.2.3~alpha7-1) unstable; urgency=medium
+
+  * Prototype opt-in developer-only supervised refresh launcher handshake.
+  * Persist authorized transaction locator and poll read-only status after restart.
+  * Bound and validate launcher response; never treat service start as APT completion.
+  * Leave normal Check and Install operations on the existing verified RC2 path.
+  * Add bilingual opt-in warning and headless reconnection/protocol tests.
+
+ -- JatayuOS Team <maintainers@jatayuos.in>  Thu, 26 Nov 2026 22:30:00 +0530
+
 jatayu-update-manager (1.2.3~alpha6-1) unstable; urgency=medium
 
   * Add read-only experimental transaction-status entry to the application menu.

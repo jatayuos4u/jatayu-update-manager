@@ -1,10 +1,12 @@
 """Jatayu Update Manager: native Qt dashboard for Debian APT."""
+import os
 import sys
 from pathlib import Path
-from PyQt6.QtCore import Qt, QProcess, QSettings, QSize, QUrl
+from PyQt6.QtCore import Qt, QProcess, QSettings, QSize, QUrl, QTimer
 from PyQt6.QtGui import QIcon, QAction, QDesktopServices
 from .transaction import parse_simulation, SimulationError
 from .status_reader import read_status, classify_status, InvalidStatus
+from .supervised_protocol import parse_launcher_reply, MAX_LAUNCH_OUTPUT
 from PyQt6.QtWidgets import (QApplication, QComboBox, QFrame, QHBoxLayout, QLabel,
     QMainWindow, QMessageBox, QPushButton, QProgressBar, QTabWidget, QTableWidget,
     QTableWidgetItem, QTextEdit, QVBoxLayout, QWidget, QHeaderView, QAbstractItemView, QStackedWidget, QLineEdit, QStyle, QSizePolicy, QToolButton, QMenu, QDialog, QDialogButtonBox, QFormLayout)
@@ -13,6 +15,9 @@ from .i18n import tr
 from . import __version__
 
 HELPER = '/usr/lib/jatayu-update-manager/privileged-helper'
+SUPERVISED_LAUNCHER = '/usr/lib/jatayu-update-manager/supervised-launcher'
+# Developer opt-in only; the published default update buttons are unchanged.
+EXPERIMENTAL_SUPERVISED = os.environ.get('JATAYU_UPDATE_MANAGER_EXPERIMENTAL') == '1'
 APP_ICON_PATH = Path('/usr/share/icons/hicolor/scalable/apps/jatayu-update-manager.svg')
 DESKTOP_FILE_ID = 'in.jatayuos.update-manager'
 
@@ -30,8 +35,17 @@ class MainWindow(QMainWindow):
         self.preview_output = bytearray()
         self.preview_too_large = False
         self.list_expanded = False
+        self.supervised_process = None
+        self.supervised_response = bytearray()
+        self.supervised_too_large = False
+        self.supervised_timer = QTimer(self)
+        self.supervised_timer.setInterval(2000)
+        self.supervised_timer.timeout.connect(self.poll_supervised_status)
         self.build_ui()
         self.load_updates()
+        if self.settings.value('supervised_transaction_id', ''):
+            self.supervised_timer.start()
+            self.poll_supervised_status()
 
     def t(self, key, **kwargs):
         return tr(self.lang, key, **kwargs)
@@ -109,12 +123,16 @@ class MainWindow(QMainWindow):
         self.license_action = QAction(self)
         self.transaction_status_action = QAction(self)
         self.transaction_status_action.triggered.connect(self.show_transaction_status)
+        self.supervised_start_action = QAction(self)
+        self.supervised_start_action.triggered.connect(self.start_supervised_refresh)
         self.about_action.triggered.connect(self.show_about)
         self.help_action.triggered.connect(self.show_help)
         self.issue_action.triggered.connect(self.open_issues)
         self.license_action.triggered.connect(self.show_license)
         for action in (self.about_action, self.help_action, self.issue_action, self.license_action, self.transaction_status_action):
             self.app_menu.addAction(action)
+        if EXPERIMENTAL_SUPERVISED:
+            self.app_menu.addAction(self.supervised_start_action)
         header.addWidget(self.menu_button)
         outer.addLayout(header)
 
@@ -316,6 +334,7 @@ class MainWindow(QMainWindow):
                             (self.issue_action, 'report_issue'), (self.license_action, 'license_credits'),
                             (self.transaction_status_action, 'transaction_status')):
             action.setText(self.t(key))
+        self.supervised_start_action.setText(self.t('supervised_start'))
         self.title_label.setText(self.t('title'))
         self.subtitle_label.setText(self.t('subtitle'))
         self.hero_title.setText(self.t('system_status'))
@@ -375,6 +394,80 @@ class MainWindow(QMainWindow):
         buttons.rejected.connect(dialog.reject)
         layout.addWidget(buttons)
         return dialog
+
+    def start_supervised_refresh(self):
+        """Opt-in developer-only refresh; not connected to normal update controls."""
+        if not EXPERIMENTAL_SUPERVISED or self.busy or self.supervised_process is not None:
+            return
+        if self.settings.value('supervised_transaction_id', ''):
+            QMessageBox.warning(self, self.t('error'), self.t('supervised_previous'))
+            return
+        if QMessageBox.question(self, self.t('supervised_start'),
+                self.t('supervised_confirm'),
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No) != QMessageBox.StandardButton.Yes:
+            return
+        self.supervised_response.clear()
+        self.supervised_too_large = False
+        process = QProcess(self)
+        self.supervised_process = process
+        process.setProcessChannelMode(QProcess.ProcessChannelMode.MergedChannels)
+        process.readyReadStandardOutput.connect(self.read_supervised_launch_reply)
+        process.finished.connect(self.supervised_launch_finished)
+        process.errorOccurred.connect(self.supervised_launch_error)
+        process.start('/usr/bin/pkexec', [SUPERVISED_LAUNCHER, 'refresh'])
+
+    def read_supervised_launch_reply(self):
+        if self.supervised_process is None:
+            return
+        data = bytes(self.supervised_process.readAllStandardOutput())
+        if len(self.supervised_response) + len(data) > MAX_LAUNCH_OUTPUT:
+            self.supervised_too_large = True
+            self.supervised_response.clear()
+            # The launcher is only a short-lived authorization process,
+            # not the privileged APT worker. Never kill the systemd service.
+            return
+        if not self.supervised_too_large:
+            self.supervised_response.extend(data)
+
+    def supervised_launch_error(self, error):
+        if error == QProcess.ProcessError.FailedToStart:
+            self.supervised_process = None
+            self.supervised_response.clear()
+            QMessageBox.warning(self, self.t('error'), self.t('supervised_launch_failed'))
+
+    def supervised_launch_finished(self, code, status):
+        if self.supervised_process is None:
+            return
+        self.read_supervised_launch_reply()
+        self.supervised_process = None
+        try:
+            if self.supervised_too_large or status != QProcess.ExitStatus.NormalExit:
+                raise ValueError('Invalid launch output')
+            identifier = parse_launcher_reply(self.supervised_response, code)
+        except ValueError:
+            QMessageBox.warning(self, self.t('error'), self.t('supervised_launch_failed'))
+            return
+        self.settings.setValue('supervised_transaction_id', identifier)
+        self.settings.sync()
+        self.supervised_timer.start()
+        self.poll_supervised_status()
+
+    def poll_supervised_status(self):
+        identifier = self.settings.value('supervised_transaction_id', '')
+        if not identifier:
+            self.supervised_timer.stop()
+            return
+        try:
+            state = classify_status(read_status(str(identifier)))
+        except (OSError, ValueError):
+            # Status may not exist immediately after systemd-run returned.
+            # Do not report completion or clear the ID on a missing record.
+            return
+        if state in ('completed', 'failed', 'interrupted_unknown'):
+            self.supervised_timer.stop()
+        # This prototype exposes status via the menu, not the normal APT
+        # progress indicator, to avoid misleading progress/success claims.
 
     def supervised_status_text(self):
         """Read-only diagnostic; never interpret a status record as package health.
