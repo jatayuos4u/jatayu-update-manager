@@ -136,28 +136,36 @@ def start_supervised(action, digest='-', owner_uid=None):
         raise PermissionError('Root authorization required')
     identifier = uuid.uuid4().hex
     validate_request(identifier, action, digest)
+    from contextlib import nullcontext
     if owner_uid is not None:
-        from .handoff import write_handoff
-        write_handoff(owner_uid, identifier, 'pending')
-    unit = 'jatayu-update-' + identifier
-    command = [
-        SYSTEMD_RUN, '--system', '--unit=' + unit, '--collect',
-        '--property=Type=exec', '--property=User=root',
-        '--property=WorkingDirectory=/', '--',
-        WORKER, identifier, action, digest,
-    ]
-    # A system service is independent of the desktop's QProcess lifetime.
-    try:
-        subprocess.run(command, check=True, capture_output=True, text=True,
-                       timeout=30, cwd='/', env=LAUNCH_ENV)
-    except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired):
-        # A timed-out launch may have reached systemd; never erase the ID.
+        from .handoff import (write_handoff, handoff_launch_lock,
+                              ensure_no_unresolved_handoff)
+        guard = handoff_launch_lock(owner_uid)
+    else:
+        guard = nullcontext()
+    with guard:
         if owner_uid is not None:
-            write_handoff(owner_uid, identifier, 'launch_unknown')
-        raise
-    if owner_uid is not None:
-        write_handoff(owner_uid, identifier, 'submitted')
-    return identifier
+            ensure_no_unresolved_handoff(owner_uid)
+            write_handoff(owner_uid, identifier, 'pending')
+        unit = 'jatayu-update-' + identifier
+        command = [
+            SYSTEMD_RUN, '--system', '--unit=' + unit, '--collect',
+            '--property=Type=exec', '--property=User=root',
+            '--property=WorkingDirectory=/', '--',
+            WORKER, identifier, action, digest,
+        ]
+        # A system service is independent of the desktop's QProcess lifetime.
+        try:
+            subprocess.run(command, check=True, capture_output=True, text=True,
+                           timeout=30, cwd='/', env=LAUNCH_ENV)
+        except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired):
+            # A timed-out launch may have reached systemd; never erase the ID.
+            if owner_uid is not None:
+                write_handoff(owner_uid, identifier, 'launch_unknown')
+            raise
+        if owner_uid is not None:
+            write_handoff(owner_uid, identifier, 'submitted')
+        return identifier
 
 
 def run_worker(identifier, action, digest, directory=STATE_DIR):

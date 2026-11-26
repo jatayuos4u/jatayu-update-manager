@@ -3,7 +3,9 @@
 Only a root-authorized launcher writes these records. A reader treats them as
 unverified transaction locators, never as proof of APT execution/completion.
 """
+import fcntl
 import json
+from contextlib import contextmanager
 import os
 from pathlib import Path
 import re
@@ -82,3 +84,46 @@ def read_handoff(uid, directory=STATE_DIR):
             or record['phase'] not in ('pending', 'submitted', 'launch_unknown')):
         raise ValueError('Invalid handoff content')
     return record
+
+
+@contextmanager
+def handoff_launch_lock(uid, directory=STATE_DIR):
+    """Serialize launchers for a user across processes.
+
+    A separate lock file is needed: atomic status-file replacements should
+    never replace the inode on which a process holds its flock.
+    """
+    root = prepare_state_directory(directory)
+    handoff_path(uid, root)  # strict type/range validation
+    path = root / ('.handoff-launch-' + str(uid) + '.lock')
+    fd = os.open(path, os.O_RDWR | os.O_CREAT | os.O_CLOEXEC | os.O_NOFOLLOW, 0o600)
+    try:
+        info = os.fstat(fd)
+        if (not stat.S_ISREG(info.st_mode) or info.st_nlink != 1
+                or info.st_mode & 0o077
+                or (os.geteuid() == 0 and info.st_uid != 0)):
+            raise ValueError('Unsafe handoff launcher lock')
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        try:
+            yield
+        finally:
+            fcntl.flock(fd, fcntl.LOCK_UN)
+    finally:
+        os.close(fd)
+
+
+def ensure_no_unresolved_handoff(uid, directory=STATE_DIR):
+    """Fail closed when an earlier handoff has no verified final outcome."""
+    try:
+        previous = read_handoff(uid, directory)
+    except FileNotFoundError:
+        return
+    from .status_reader import read_status
+    try:
+        status = read_status(previous['id'], directory=directory)
+    except (FileNotFoundError, ValueError, OSError) as exc:
+        raise RuntimeError('Previous transaction needs inspection') from exc
+    if status['state'] not in ('completed', 'failed'):
+        raise RuntimeError('Previous transaction has no final status')
+    # A final record is not proof of package integrity, but the pointer can
+    # be superseded after the supervisor has recorded a terminal result.

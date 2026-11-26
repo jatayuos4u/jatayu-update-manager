@@ -50,6 +50,8 @@ class HandoffTests(unittest.TestCase):
         events = []
         from unittest.mock import Mock
         with patch.object(supervisor.os, 'geteuid', return_value=0), \
+             patch.object(handoff, 'handoff_launch_lock', return_value=__import__('contextlib').nullcontext()), \
+             patch.object(handoff, 'ensure_no_unresolved_handoff'), \
              patch.object(handoff, 'write_handoff',
                           side_effect=lambda uid, ident, state: events.append(state)), \
              patch.object(supervisor.subprocess, 'run', return_value=Mock(returncode=0)) as launch:
@@ -60,9 +62,47 @@ class HandoffTests(unittest.TestCase):
 
     def test_unknown_launch_keeps_recovery_locator(self):
         with patch.object(supervisor.os, 'geteuid', return_value=0), \
+             patch.object(handoff, 'handoff_launch_lock', return_value=__import__('contextlib').nullcontext()), \
+             patch.object(handoff, 'ensure_no_unresolved_handoff'), \
              patch.object(handoff, 'write_handoff') as track, \
              patch.object(supervisor.subprocess, 'run', side_effect=OSError('no service')):
             with self.assertRaises(OSError):
                 supervisor.start_supervised('refresh', owner_uid=1000)
             self.assertEqual([call.args[2] for call in track.call_args_list],
                              ['pending', 'launch_unknown'])
+
+    def test_pending_handoff_blocks_overwrite(self):
+        with tempfile.TemporaryDirectory() as tmp, \
+             patch.object(handoff.os, 'geteuid', return_value=0):
+            handoff.write_handoff(1000, 'a'*32, 'pending', tmp)
+            with self.assertRaises(RuntimeError):
+                handoff.ensure_no_unresolved_handoff(1000, tmp)
+            self.assertEqual(handoff.read_handoff(1000, tmp)['id'], 'a'*32)
+
+    def test_completed_handoff_allows_next_launch(self):
+        from jatayu_update_manager.supervisor import write_status
+        with tempfile.TemporaryDirectory() as tmp, \
+             patch.object(handoff.os, 'geteuid', return_value=0):
+            handoff.write_handoff(1000, 'a'*32, 'submitted', tmp)
+            write_status('a'*32, 'refresh', 'completed', 0, directory=tmp)
+            handoff.ensure_no_unresolved_handoff(1000, tmp)
+
+    def test_unresolved_handoff_blocks_service_launch(self):
+        with patch.object(supervisor.os, 'geteuid', return_value=0), \
+             patch.object(handoff, 'handoff_launch_lock',
+                          return_value=__import__('contextlib').nullcontext()), \
+             patch.object(handoff, 'ensure_no_unresolved_handoff',
+                          side_effect=RuntimeError('unresolved')), \
+             patch.object(supervisor.subprocess, 'run') as runner:
+            with self.assertRaises(RuntimeError):
+                supervisor.start_supervised('refresh', owner_uid=1000)
+            runner.assert_not_called()
+
+    def test_singleflight_handoff_lock_acquired_and_released(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            with handoff.handoff_launch_lock(1000, tmp):
+                with self.assertRaises(BlockingIOError):
+                    with handoff.handoff_launch_lock(1000, tmp):
+                        pass
+            with handoff.handoff_launch_lock(1000, tmp):
+                pass

@@ -1,3 +1,13 @@
+jatayu-update-manager (1.2.3~alpha11-1) unstable; urgency=medium
+
+  * Prevent reusing a per-user recovery pointer while a transaction is unresolved.
+  * Serialize competing launchers using a distinct advisory lock file.
+  * Refuse a second launch if prior status is missing, incomplete or invalid.
+  * Add negative regression tests for launch ordering and handoff safety.
+  * Preserve existing normal APT buttons and development-only service path.
+
+ -- JatayuOS Team <maintainers@jatayuos.in>  Thu, 26 Nov 2026 21:40:00 +0530
+
 jatayu-update-manager (1.2.3~alpha10-1) unstable; urgency=medium
 
   * Persist root-owned per-user transaction locator before starting systemd-run.
