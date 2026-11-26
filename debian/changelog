@@ -1,3 +1,13 @@
+jatayu-update-manager (1.2.3~alpha17-1) unstable; urgency=medium
+
+  * Add disposable-VM integration harness for actual supervised worker code.
+  * Run real worker status/locking logic under systemd with an isolated fake helper.
+  * Exercise successful and failed mock actions after launcher process termination.
+  * Require explicit root, Debian 13 VM and operator acknowledgement to execute.
+  * Keep APT/dpkg untouched and normal update workflow unchanged.
+
+ -- JatayuOS Team <maintainers@jatayuos.in>  Thu, 26 Nov 2026 23:55:00 +0530
+
 jatayu-update-manager (1.2.3~alpha16-1) unstable; urgency=medium
 
   * Add a guarded Debian 13 disposable-VM systemd smoke harness with a mock task.

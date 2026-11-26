@@ -81,3 +81,7 @@ The Debian 13 CI now unpacks the built development `.deb` without installing it.
 ## Stage A16 — disposable-VM-only systemd smoke preparation
 
 An explicitly gated harness checks whether a harmless systemd transient service survives termination of its controller in a disposable Debian 13 VM. It refuses non-root, non-VM and unacknowledged execution. GitHub CI does not execute the live systemd test; its tests cover the harness safety gates. Real APT, Polkit, reboot and interrupted-dpkg integration remain unverified and required for a stable release.
+
+## Stage A17 — VM actual-worker harness, not yet VM-tested
+
+The new `integration/vm_real_worker_smoke.py` starts the project's own `supervisor.run_worker` through a transient systemd unit with a hard-gated isolated mock-helper adapter. It is designed to observe a running status, kill the launcher process, and verify the final worker journal for both return code 0 and 42. It requires root and a disposable Debian 13 VM. GitHub CI validates only the harness gates and packaging and does **not** run a real systemd manager. A real APT/Polkit transaction is not exercised; stable release remains blocked.
