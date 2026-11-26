@@ -49,3 +49,7 @@ An experimental **refresh-only** launcher is visible solely with environment var
 ## Stage A8 — liveness reconciliation
 
 For an existing validated transaction record, a separate bounded `systemctl --system show` query now checks the transaction's systemd unit state and confirms that its configured ExecStart points at the packaged root worker and includes the matching transaction ID. Active units can be displayed as `running_confirmed`, but **this only confirms systemd service state, not that APT is installing packages**. If a record remains running but its unit has disappeared, report `interrupted_unknown`, never success. If the systemd query fails, report `running_unverified`, not interruption. This read-only check makes no service changes. Final status records are still based on worker reports, and actual crash survival and package-repair testing remain pending.
+
+## Stage A9 — isolated controller-crash fault injection
+
+New automated tests start a worker with a **temporary fake helper**, detach it from a controller process, kill the controller, and verify that the worker can still complete and persist its status. They also check that an inactive worker with a running record remains an unknown outcome. This test invokes **no real APT, dpkg, Polkit, or systemd** and does not prove that the packaged transient systemd unit will survive a real GUI crash. A real systemd/Polkit end-to-end test and crash-before-ID-handoff recovery design are still necessary before switching normal update buttons or approving a stable release.

@@ -1,3 +1,13 @@
+jatayu-update-manager (1.2.3~alpha9-1) unstable; urgency=medium
+
+  * Add subprocess fault injection for a detached worker and killed controller.
+  * Verify isolated worker status reaches completion without a living GUI controller.
+  * Verify unfinished records do not become success after an inactive worker.
+  * Never invoke real APT or systemd in these fault-injection tests.
+  * Retain developer-only supervised service option and RC2 default backend.
+
+ -- JatayuOS Team <maintainers@jatayuos.in>  Thu, 26 Nov 2026 23:30:00 +0530
+
 jatayu-update-manager (1.2.3~alpha8-1) unstable; urgency=medium
 
   * Verify the active systemd unit against the expected root worker path.
