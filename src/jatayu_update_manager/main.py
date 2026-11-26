@@ -7,7 +7,7 @@ from PyQt6.QtGui import QIcon, QAction, QDesktopServices
 from .transaction import parse_simulation, SimulationError
 from .status_reader import read_status, reconcile_status, InvalidStatus
 from .supervised_protocol import parse_launcher_reply, MAX_LAUNCH_OUTPUT
-from .handoff import read_handoff
+# Recovery handoffs are deliberately root-only pending an authorized IPC API.
 from PyQt6.QtWidgets import (QApplication, QComboBox, QFrame, QHBoxLayout, QLabel,
     QMainWindow, QMessageBox, QPushButton, QProgressBar, QTabWidget, QTableWidget,
     QTableWidgetItem, QTextEdit, QVBoxLayout, QWidget, QHeaderView, QAbstractItemView, QStackedWidget, QLineEdit, QStyle, QSizePolicy, QToolButton, QMenu, QDialog, QDialogButtonBox, QFormLayout)
@@ -398,17 +398,13 @@ class MainWindow(QMainWindow):
         return dialog
 
     def recover_supervised_handoff(self):
-        """Only discover a root-written locator; never assume the update succeeded."""
-        if not EXPERIMENTAL_SUPERVISED:
-            return
-        if self.settings.value('supervised_transaction_id', ''):
-            return
-        try:
-            record = read_handoff(os.getuid())
-        except (OSError, ValueError):
-            return
-        self.settings.setValue('supervised_transaction_id', record['id'])
-        self.settings.sync()
+        """Fail closed: no direct GUI access to root-owned recovery handoffs.
+
+        The GUI can retain a transaction ID already returned by pkexec, but
+        must not bypass user isolation by inspecting root-owned UID records.
+        An authenticated read-only service is needed for lost-ID recovery.
+        """
+        return
 
     def start_supervised_refresh(self):
         """Opt-in developer-only refresh; not connected to normal update controls."""

@@ -18,6 +18,7 @@ class HandoffTests(unittest.TestCase):
             self.assertEqual(handoff.read_handoff(1000, tmp),
                              {'uid': 1000, 'id': 'a'*32, 'phase': 'submitted'})
             self.assertFalse(list(Path(tmp).glob('.handoff-*')))
+            self.assertEqual(handoff.handoff_path(1000, tmp).stat().st_mode & 0o777, 0o600)
 
     def test_handoff_rejects_wrong_account(self):
         with tempfile.TemporaryDirectory() as tmp, \
@@ -131,3 +132,22 @@ class HandoffTests(unittest.TestCase):
             with patch('jatayu_update_manager.status_reader.check_worker_unit',
                        return_value='inactive'):
                 handoff.ensure_no_unresolved_handoff(1000, tmp)
+
+    def test_unprivileged_handoff_read_rejected_even_for_known_uid(self):
+        with tempfile.TemporaryDirectory() as tmp, \
+             patch.object(handoff.os, 'geteuid', return_value=0):
+            handoff.write_handoff(1000, 'a'*32, 'pending', tmp)
+        with tempfile.TemporaryDirectory() as tmp, \
+             patch.object(handoff.os, 'geteuid', return_value=1000):
+            with self.assertRaises(PermissionError):
+                handoff.read_handoff(1000, tmp)
+
+    def test_other_unprivileged_account_cannot_read_root_handoff(self):
+        with tempfile.TemporaryDirectory() as tmp, \
+             patch.object(handoff.os, 'geteuid', return_value=0):
+            handoff.write_handoff(1000, 'a'*32, 'pending', tmp)
+            path = handoff.handoff_path(1000, tmp)
+            self.assertEqual(path.stat().st_mode & 0o777, 0o600)
+        with patch.object(handoff.os, 'geteuid', return_value=1001):
+            with self.assertRaises(PermissionError):
+                handoff.read_handoff(1000, tmp)

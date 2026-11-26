@@ -45,13 +45,18 @@ def status_path(identifier, directory=STATE_DIR):
 def prepare_state_directory(directory):
     """Reject root status locations writable by untrusted users."""
     directory = Path(directory)
-    directory.mkdir(mode=0o755, parents=True, exist_ok=True)
+    # Searchable but not listable by unprivileged users: exact transaction
+    # IDs may still be inspected read-only. The per-UID handoff stays root-only.
+    directory.mkdir(mode=0o711, parents=True, exist_ok=True)
     details = directory.lstat()
     if not stat.S_ISDIR(details.st_mode) or (details.st_mode & 0o022):
         raise OSError('Unsafe transaction state directory')
     # A production worker runs as root. Existing state must also be root-owned.
     if os.geteuid() == 0 and details.st_uid != 0:
         raise OSError('Transaction state directory is not root-owned')
+    # Only adjust the canonical production directory. Preserve test fixtures.
+    if directory == STATE_DIR and os.geteuid() == 0 and details.st_mode & 0o044:
+        directory.chmod(stat.S_IMODE(details.st_mode) & ~0o044)
     return directory
 
 

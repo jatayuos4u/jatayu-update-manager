@@ -154,17 +154,16 @@ class UpdateListLayoutTests(unittest.TestCase):
         self.assertIn('systemd worker is active', text)
         self.window.settings.remove('supervised_transaction_id')
 
-    def test_opt_in_startup_recovers_only_current_user_handoff(self):
+    def test_gui_does_not_read_root_handoff_without_ipc(self):
         from jatayu_update_manager.main import MainWindow
+        self.window.settings.remove('supervised_transaction_id')
         with patch('jatayu_update_manager.main.EXPERIMENTAL_SUPERVISED', True), \
-             patch('jatayu_update_manager.main.read_handoff',
-                   return_value={'uid': 1000, 'id': 'b'*32, 'phase': 'pending'}), \
-             patch('jatayu_update_manager.main.read_status', side_effect=FileNotFoundError):
-            self.window.settings.remove('supervised_transaction_id')
+             patch('jatayu_update_manager.handoff.read_handoff') as reader:
             reopened = MainWindow()
             try:
-                self.assertEqual(reopened.settings.value('supervised_transaction_id'), 'b'*32)
+                reader.assert_not_called()
+                self.assertFalse(reopened.settings.value('supervised_transaction_id', ''))
             finally:
                 reopened.supervised_timer.stop()
                 reopened.close()
-                reopened.settings.remove('supervised_transaction_id')
+

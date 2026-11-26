@@ -37,7 +37,9 @@ def write_handoff(uid, identifier, phase, directory=STATE_DIR):
     fd, temp = tempfile.mkstemp(prefix='.handoff-', dir=directory)
     try:
         with os.fdopen(fd, 'w', encoding='utf-8') as out:
-            os.fchmod(out.fileno(), 0o644)
+            # Root-owned and root-readable only. Never expose a caller UID's
+            # transaction locator to another unprivileged local account.
+            os.fchmod(out.fileno(), 0o600)
             json.dump({'uid': uid, 'id': identifier, 'phase': phase}, out)
             out.write('\n')
             out.flush()
@@ -54,7 +56,13 @@ def write_handoff(uid, identifier, phase, directory=STATE_DIR):
 
 
 def read_handoff(uid, directory=STATE_DIR):
-    """Read only the requesting user's root-created handoff locator."""
+    """Privileged reader only until an authenticated per-user IPC exists.
+
+    A UID in a filename is not an authorization check. The GUI must not
+    directly open root-only recovery files or expose an unauthenticated API.
+    """
+    if os.geteuid() != 0:
+        raise PermissionError('Handoff recovery requires a privileged reader')
     folder = Path(directory)
     mode = folder.lstat()
     if not stat.S_ISDIR(mode.st_mode) or mode.st_mode & 0o022:
@@ -66,7 +74,7 @@ def read_handoff(uid, directory=STATE_DIR):
     try:
         st = os.fstat(fd)
         if (not stat.S_ISREG(st.st_mode) or st.st_nlink != 1
-                or st.st_mode & 0o022 or st.st_size > _MAX
+                or st.st_mode & 0o077 or st.st_size > _MAX
                 or (folder == STATE_DIR and st.st_uid != 0)):
             raise ValueError('Unsafe handoff file')
         data = os.read(fd, _MAX + 1)

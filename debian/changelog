@@ -1,3 +1,13 @@
+jatayu-update-manager (1.2.3~alpha13-1) unstable; urgency=medium
+
+  * Restrict root-owned per-user handoff recovery records to mode 0600.
+  * Prevent direct unprivileged access to private handoff data.
+  * Make the production transaction directory non-listable by ordinary users.
+  * Disable unsafe automatic GUI handoff recovery pending authenticated IPC.
+  * Add regression tests for permissions and deliberately disabled recovery.
+
+ -- JatayuOS Team <maintainers@jatayuos.in>  Thu, 26 Nov 2026 22:15:00 +0530
+
 jatayu-update-manager (1.2.3~alpha12-1) unstable; urgency=medium
 
   * Block handoff replacement until previous transaction has final state and inactive systemd unit.
