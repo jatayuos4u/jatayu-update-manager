@@ -144,3 +144,46 @@ class SupervisorTests(unittest.TestCase):
             for state, code in bad:
                 with self.subTest(state=state, code=code), self.assertRaises(ValueError):
                     s.write_status('d'*32, 'refresh', state, code, tmp)
+
+    def test_trusted_directory_rejects_symlink(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / 'target'
+            target.mkdir()
+            link = Path(tmp) / 'link'
+            link.symlink_to(target, target_is_directory=True)
+            with self.assertRaises(OSError):
+                s.verify_trusted_directory(link)
+
+    def test_trusted_directory_rejects_world_writable_parent(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            parent = Path(tmp) / 'parent'
+            parent.mkdir()
+            parent.chmod(0o777)
+            with self.assertRaises(OSError):
+                s.verify_trusted_directory(parent)
+
+    def test_production_parent_chain_fails_before_state_creation(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            parent = Path(tmp) / 'parent'
+            parent.mkdir()
+            parent.chmod(0o777)
+            fake_state = parent / 'transactions'
+            with patch.object(s, 'STATE_DIR', fake_state), \
+                 self.assertRaises(OSError):
+                s.prepare_state_directory(fake_state)
+            self.assertFalse(fake_state.exists())
+
+    def test_nonproduction_test_directory_does_not_check_host_ancestors(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            testdir = Path(tmp) / 'isolated'
+            self.assertEqual(s.prepare_state_directory(testdir), testdir)
+            self.assertTrue(testdir.is_dir())
+
+    def test_root_owned_private_parent_is_trusted(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            rootdir = Path(tmp) / 'trusted'
+            rootdir.mkdir(mode=0o700)
+            if os.geteuid() == 0:
+                self.assertEqual(s.verify_trusted_directory(rootdir), rootdir)
+            else:
+                self.skipTest('Root-only ownership check')

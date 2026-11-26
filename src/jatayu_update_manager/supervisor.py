@@ -42,9 +42,42 @@ def status_path(identifier, directory=STATE_DIR):
     return Path(directory) / (identifier + '.json')
 
 
+def verify_trusted_directory(path):
+    """Reject symlinked, non-root-owned or untrusted writable parent dirs.
+
+    Used only for the fixed production hierarchy; temporary isolated test
+    directories intentionally have different ownership and ancestor policies.
+    No chown, unlink or permission mutation is performed by this check.
+    """
+    path = Path(path)
+    details = path.lstat()  # lstat rejects symlinks instead of following them
+    if not stat.S_ISDIR(details.st_mode):
+        raise OSError('Unsafe transaction directory component')
+    if details.st_uid != 0 or details.st_mode & 0o022:
+        raise OSError('Untrusted transaction directory ownership or permissions')
+    return path
+
+
+def verify_production_state_parents(directory):
+    """Check every directory leading to the fixed root-owned state path.
+
+    A root-owned, non-writable parent tree makes the later open/create safer
+    against unprivileged path substitution. This is not an atomic openat2
+    RESOLVE_BENEATH guarantee and requires VM review before production.
+    """
+    directory = Path(directory)
+    if directory != STATE_DIR:
+        return
+    for component in reversed(list(directory.parents)):
+        verify_trusted_directory(component)
+    # The final directory may not exist on first launch; its already existing
+    # parent must be trusted before mkdir creates any state under it.
+
+
 def prepare_state_directory(directory):
     """Reject root status locations writable by untrusted users."""
     directory = Path(directory)
+    verify_production_state_parents(directory)
     # Searchable but not listable by unprivileged users: exact transaction
     # IDs may still be inspected read-only. The per-UID handoff stays root-only.
     directory.mkdir(mode=0o711, parents=True, exist_ok=True)

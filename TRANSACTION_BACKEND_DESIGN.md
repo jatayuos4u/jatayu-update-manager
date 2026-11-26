@@ -89,3 +89,7 @@ The new `integration/vm_real_worker_smoke.py` starts the project's own `supervis
 ## Stage A18 — mock adapter path hardening
 
 The VM adapter now rejects symbolic-link paths **before resolution**, validates the helper is a regular single-link root-owned executable with no group/world permissions, and requires a root-owned private test directory. Regression tests ensure no worker is invoked when symlinks or loose permissions are provided. This narrows the risk of a misleading or unsafe test harness; it does **not** constitute a completed real-VM test. Live systemd, Polkit and package-transaction fault injection are still required.
+
+## Stage A19 — fail-closed production state parent verification
+
+Before creating the fixed production transaction-status directory, the supervisor now uses `lstat` to validate the ancestor directories as genuine root-owned directories without group/world write permission; a symlinked or untrusted parent blocks the privileged worker. Isolated test directories use the existing test-only policy. Tests cover symlinked components, writable parents, and rejection before creating state. This significantly reduces the opportunity for an unprivileged user to redirect root-owned journal writes, but per-component checks are not atomic openat2 resolution; real VM integration and a remaining privileged-state review still block release.

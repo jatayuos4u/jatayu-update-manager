@@ -1,3 +1,13 @@
+jatayu-update-manager (1.2.3~alpha19-1) unstable; urgency=medium
+
+  * Fail closed if the production state directory's parent path is untrusted.
+  * Reject symlinked, non-root-owned or group/world-writable parent components.
+  * Validate parent chain before creating transaction state directories.
+  * Add mocked and isolated tests; do not alter normal update controls.
+  * Preserve VM-only service integration release gate.
+
+ -- JatayuOS Team <maintainers@jatayuos.in>  Thu, 26 Nov 2026 22:30:00 +0530
+
 jatayu-update-manager (1.2.3~alpha18-1) unstable; urgency=medium
 
   * Reject mock-helper symlinks before resolving VM test paths.

@@ -8,10 +8,10 @@ ROOT = Path(__file__).resolve().parents[1]
 class PackageAuditSourceTests(unittest.TestCase):
     def test_workflow_audits_the_actual_built_deb(self):
         workflow = (ROOT / '.github/workflows/debian-13-ci.yml').read_text()
-        self.assertIn('scripts/audit_deb.py ../jatayu-update-manager_1.2.3~alpha18-1_all.deb', workflow)
+        self.assertIn('scripts/audit_deb.py ../jatayu-update-manager_1.2.3~alpha19-1_all.deb', workflow)
         self.assertIn('dpkg-buildpackage -us -uc -b', workflow)
         self.assertLess(workflow.index('dpkg-buildpackage -us -uc -b'),
-                        workflow.index('scripts/audit_deb.py ../jatayu-update-manager_1.2.3~alpha18-1_all.deb'))
+                        workflow.index('scripts/audit_deb.py ../jatayu-update-manager_1.2.3~alpha19-1_all.deb'))
 
     def test_packaged_policy_helpers_in_rules(self):
         rules = (ROOT / 'debian/rules').read_text()
