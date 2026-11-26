@@ -1,0 +1,84 @@
+"""Conservative per-user handoff record for GUI crash-before-ID-save recovery.
+
+Only a root-authorized launcher writes these records. A reader treats them as
+unverified transaction locators, never as proof of APT execution/completion.
+"""
+import json
+import os
+from pathlib import Path
+import re
+import stat
+import tempfile
+
+from .supervisor import STATE_DIR, prepare_state_directory
+
+_ID = re.compile(r'[0-9a-f]{32}\Z')
+_MAX = 512
+
+
+def handoff_path(uid, directory=STATE_DIR):
+    if type(uid) is not int or not 0 <= uid <= 4294967295:
+        raise ValueError('Invalid account ID')
+    return Path(directory) / ('handoff-' + str(uid) + '.json')
+
+
+def write_handoff(uid, identifier, phase, directory=STATE_DIR):
+    """Atomically preserve the locator before asking systemd to start work."""
+    if os.geteuid() != 0:
+        raise PermissionError('Only root may update a handoff record')
+    if not isinstance(identifier, str) or not _ID.fullmatch(identifier):
+        raise ValueError('Invalid transaction ID')
+    if phase not in ('pending', 'submitted', 'launch_unknown'):
+        raise ValueError('Invalid handoff phase')
+    directory = prepare_state_directory(directory)
+    dest = handoff_path(uid, directory)
+    fd, temp = tempfile.mkstemp(prefix='.handoff-', dir=directory)
+    try:
+        with os.fdopen(fd, 'w', encoding='utf-8') as out:
+            os.fchmod(out.fileno(), 0o644)
+            json.dump({'uid': uid, 'id': identifier, 'phase': phase}, out)
+            out.write('\n')
+            out.flush()
+            os.fsync(out.fileno())
+        os.replace(temp, dest)
+        fd_dir = os.open(directory, os.O_DIRECTORY | os.O_RDONLY)
+        try:
+            os.fsync(fd_dir)
+        finally:
+            os.close(fd_dir)
+    finally:
+        if os.path.exists(temp):
+            os.unlink(temp)
+
+
+def read_handoff(uid, directory=STATE_DIR):
+    """Read only the requesting user's root-created handoff locator."""
+    folder = Path(directory)
+    mode = folder.lstat()
+    if not stat.S_ISDIR(mode.st_mode) or mode.st_mode & 0o022:
+        raise ValueError('Unsafe handoff directory')
+    if folder == STATE_DIR and mode.st_uid != 0:
+        raise ValueError('Handoff directory must be root-owned')
+    fd = os.open(handoff_path(uid, folder),
+                 os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC)
+    try:
+        st = os.fstat(fd)
+        if (not stat.S_ISREG(st.st_mode) or st.st_nlink != 1
+                or st.st_mode & 0o022 or st.st_size > _MAX
+                or (folder == STATE_DIR and st.st_uid != 0)):
+            raise ValueError('Unsafe handoff file')
+        data = os.read(fd, _MAX + 1)
+    finally:
+        os.close(fd)
+    if len(data) > _MAX:
+        raise ValueError('Oversized handoff')
+    try:
+        record = json.loads(data.decode('utf-8'))
+    except (UnicodeError, ValueError) as exc:
+        raise ValueError('Invalid handoff encoding') from exc
+    if (type(record) is not dict or set(record) != {'uid', 'id', 'phase'}
+            or type(record['uid']) is not int or record['uid'] != uid
+            or type(record['id']) is not str or not _ID.fullmatch(record['id'])
+            or record['phase'] not in ('pending', 'submitted', 'launch_unknown')):
+        raise ValueError('Invalid handoff content')
+    return record

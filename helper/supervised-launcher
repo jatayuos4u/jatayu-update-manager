@@ -31,7 +31,11 @@ def main(argv=None):
         print('Invalid supervised transaction request.', file=sys.stderr)
         return 2
     try:
-        identifier = start_supervised(action, digest)
+        # pkexec supplies the original requester UID in a controlled environment.
+        owner = os.environ.get('PKEXEC_UID')
+        if owner is None or not owner.isascii() or not owner.isdecimal():
+            raise ValueError('Missing authenticated caller identity')
+        identifier = start_supervised(action, digest, owner_uid=int(owner))
     except (OSError, ValueError) as exc:
         print('Unable to start supervised transaction: ' + str(exc), file=sys.stderr)
         return 3

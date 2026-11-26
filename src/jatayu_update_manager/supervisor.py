@@ -130,12 +130,15 @@ def boot_id():
     return 'unavailable'
 
 
-def start_supervised(action, digest='-'):
+def start_supervised(action, digest='-', owner_uid=None):
     """Only a root-authorized launcher may call this. Returns transaction ID."""
     if os.geteuid() != 0:
         raise PermissionError('Root authorization required')
     identifier = uuid.uuid4().hex
     validate_request(identifier, action, digest)
+    if owner_uid is not None:
+        from .handoff import write_handoff
+        write_handoff(owner_uid, identifier, 'pending')
     unit = 'jatayu-update-' + identifier
     command = [
         SYSTEMD_RUN, '--system', '--unit=' + unit, '--collect',
@@ -144,8 +147,16 @@ def start_supervised(action, digest='-'):
         WORKER, identifier, action, digest,
     ]
     # A system service is independent of the desktop's QProcess lifetime.
-    subprocess.run(command, check=True, capture_output=True, text=True,
-                   timeout=30, cwd='/', env=LAUNCH_ENV)
+    try:
+        subprocess.run(command, check=True, capture_output=True, text=True,
+                       timeout=30, cwd='/', env=LAUNCH_ENV)
+    except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired):
+        # A timed-out launch may have reached systemd; never erase the ID.
+        if owner_uid is not None:
+            write_handoff(owner_uid, identifier, 'launch_unknown')
+        raise
+    if owner_uid is not None:
+        write_handoff(owner_uid, identifier, 'submitted')
     return identifier
 
 

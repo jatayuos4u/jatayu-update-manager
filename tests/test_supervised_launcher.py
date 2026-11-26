@@ -46,10 +46,11 @@ class LauncherTests(unittest.TestCase):
     def test_authorized_launch_emits_only_transaction_locator(self):
         launcher = load_launcher()
         with patch.object(launcher.os, 'geteuid', return_value=0), \
+             patch.dict(launcher.os.environ, {'PKEXEC_UID': '1000'}), \
              patch.object(launcher, 'start_supervised', return_value='b' * 32) as runner, \
              patch('builtins.print') as output:
             self.assertEqual(launcher.main(['upgrade', 'c' * 64]), 0)
-            runner.assert_called_once_with('upgrade', 'c' * 64)
+            runner.assert_called_once_with('upgrade', 'c' * 64, owner_uid=1000)
             output.assert_called_once_with('TRANSACTION_ID=' + 'b' * 32, flush=True)
 
     def test_failed_systemd_launch_is_not_reported_success(self):
@@ -74,3 +75,11 @@ class LauncherTests(unittest.TestCase):
         rules = (ROOT / 'debian/rules').read_text()
         self.assertIn('helper/supervised-launcher', rules)
         self.assertIn('in.jatayuos.update-manager.supervised.policy', rules)
+
+    def test_missing_caller_identity_rejects_launch(self):
+        launcher = load_launcher()
+        with patch.object(launcher.os, 'geteuid', return_value=0), \
+             patch.dict(launcher.os.environ, {}, clear=True), \
+             patch.object(launcher, 'start_supervised') as runner:
+            self.assertEqual(launcher.main(['refresh']), 3)
+            runner.assert_not_called()

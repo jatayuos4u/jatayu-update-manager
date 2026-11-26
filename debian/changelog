@@ -1,3 +1,13 @@
+jatayu-update-manager (1.2.3~alpha10-1) unstable; urgency=medium
+
+  * Persist root-owned per-user transaction locator before starting systemd-run.
+  * Mark unknown launcher outcomes without erasing recovery information.
+  * Allow developer-opt-in GUI to rediscover an authorized handoff after restart.
+  * Add isolation tests for account boundary, damaged files and launch ordering.
+  * Keep normal update buttons on the existing RC2 backend.
+
+ -- JatayuOS Team <maintainers@jatayuos.in>  Thu, 26 Nov 2026 21:15:00 +0530
+
 jatayu-update-manager (1.2.3~alpha9-1) unstable; urgency=medium
 
   * Add subprocess fault injection for a detached worker and killed controller.
