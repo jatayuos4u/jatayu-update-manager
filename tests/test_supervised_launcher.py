@@ -83,3 +83,11 @@ class LauncherTests(unittest.TestCase):
              patch.object(launcher, 'start_supervised') as runner:
             self.assertEqual(launcher.main(['refresh']), 3)
             runner.assert_not_called()
+
+    def test_unresolved_handoff_gives_safe_error(self):
+        launcher = load_launcher()
+        with patch.object(launcher.os, 'geteuid', return_value=0), \
+             patch.dict(launcher.os.environ, {'PKEXEC_UID': '1000'}), \
+             patch.object(launcher, 'start_supervised',
+                          side_effect=RuntimeError('previous transaction unresolved')):
+            self.assertEqual(launcher.main(['refresh']), 3)
