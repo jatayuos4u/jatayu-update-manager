@@ -77,3 +77,7 @@ A separate, dedicated `pkexec` executable `recovery-lookup` reads only the previ
 ## Stage A15 — audit the actual packaged privilege surface
 
 The Debian 13 CI now unpacks the built development `.deb` without installing it. The audit checks that all three policy actions point at their expected installed executables, require active administrator authorization, have no permissive inactive/remote defaults, and that helper binaries are executable without unsafe write/setuid bits. The audit also rejects world-writable and setuid/setgid package entries. This is a static package check, not a live authorization or malicious-package installation test; it cannot establish the installed systemd/Polkit integration works. Continue to treat supervised transactions as developer-only pending disposable VM validation.
+
+## Stage A16 — disposable-VM-only systemd smoke preparation
+
+An explicitly gated harness checks whether a harmless systemd transient service survives termination of its controller in a disposable Debian 13 VM. It refuses non-root, non-VM and unacknowledged execution. GitHub CI does not execute the live systemd test; its tests cover the harness safety gates. Real APT, Polkit, reboot and interrupted-dpkg integration remain unverified and required for a stable release.

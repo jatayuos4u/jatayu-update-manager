@@ -1,3 +1,13 @@
+jatayu-update-manager (1.2.3~alpha16-1) unstable; urgency=medium
+
+  * Add a guarded Debian 13 disposable-VM systemd smoke harness with a mock task.
+  * Verify the mock worker can survive its controller process termination.
+  * Require explicit acknowledgement, root and virtualization checks to run.
+  * Test harness safety gates in CI without executing a live systemd unit.
+  * Preserve normal update backend; no production crash-safety claims.
+
+ -- JatayuOS Team <maintainers@jatayuos.in>  Thu, 26 Nov 2026 23:45:00 +0530
+
 jatayu-update-manager (1.2.3~alpha15-1) unstable; urgency=medium
 
   * Audit built Debian package contents, not source manifests alone.
