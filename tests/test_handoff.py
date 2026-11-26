@@ -76,8 +76,6 @@ class HandoffTests(unittest.TestCase):
              patch.object(handoff.os, 'geteuid', return_value=0):
             handoff.write_handoff(1000, 'a'*32, 'pending', tmp)
             with self.assertRaises(RuntimeError):
-                with patch('jatayu_update_manager.status_reader.check_worker_unit',
-                       return_value='inactive'):
                 handoff.ensure_no_unresolved_handoff(1000, tmp)
             self.assertEqual(handoff.read_handoff(1000, tmp)['id'], 'a'*32)
 
@@ -87,7 +85,9 @@ class HandoffTests(unittest.TestCase):
              patch.object(handoff.os, 'geteuid', return_value=0):
             handoff.write_handoff(1000, 'a'*32, 'submitted', tmp)
             write_status('a'*32, 'refresh', 'completed', 0, directory=tmp)
-            handoff.ensure_no_unresolved_handoff(1000, tmp)
+            with patch('jatayu_update_manager.status_reader.check_worker_unit',
+                       return_value='inactive'):
+                handoff.ensure_no_unresolved_handoff(1000, tmp)
 
     def test_unresolved_handoff_blocks_service_launch(self):
         with patch.object(supervisor.os, 'geteuid', return_value=0), \
