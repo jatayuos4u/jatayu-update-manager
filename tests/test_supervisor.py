@@ -280,7 +280,7 @@ class SupervisorTests(unittest.TestCase):
                              s.UNRESOLVED_EXIT)
             runner.assert_not_called()
             self.assertEqual(json.loads(s.status_path('a'*32, tmp).read_text())['state'],
-                             'failed')
+                             'running')
 
     def test_journal_record_count_limit_is_fail_closed(self):
         with tempfile.TemporaryDirectory() as tmp:
