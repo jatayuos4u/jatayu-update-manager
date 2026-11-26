@@ -93,7 +93,7 @@ class UpdateListLayoutTests(unittest.TestCase):
         self.window.settings.setValue('supervised_transaction_id', 'a' * 32)
         record = {'state': 'running', 'boot_id': 'a' * 36, 'exit_code': None}
         with patch('jatayu_update_manager.main.read_status', return_value=record), \
-             patch('jatayu_update_manager.main.classify_status', return_value='interrupted_unknown'):
+             patch('jatayu_update_manager.main.reconcile_status', return_value='interrupted_unknown'):
             text = self.window.supervised_status_text()
         self.assertIn('outcome is unknown', text)
         self.window.settings.remove('supervised_transaction_id')
