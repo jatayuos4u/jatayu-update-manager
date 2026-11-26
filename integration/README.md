@@ -23,3 +23,7 @@ sudo env JATAYU_VM_WORKER_ACK=YES python3 integration/vm_real_worker_smoke.py --
 ```
 
 Successful output reports both `mock-success` and `mock-failure` passing, with `apt_touched: false`. **No actual VM run has been performed by CI.** Polkit interactive authentication, live package upgrade interruption and reboot recovery are still untested and remain release blockers.
+
+## Alpha 18 test-harness security review
+
+The disposable-VM adapter rejects symlinked helper or directory paths, unsafe ownership, and group/world-accessible mock resources before it calls the actual transaction worker. These safeguards ensure the test cannot be silently redirected to a different helper through a simple symlink. CI checks this logic with isolated temporary directories; systemd itself is not invoked by CI.

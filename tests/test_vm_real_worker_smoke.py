@@ -55,3 +55,51 @@ class RealWorkerVmHarnessTests(unittest.TestCase):
     def test_ci_never_runs_vm_workload(self):
         workflow = (ROOT / '.github/workflows/debian-13-ci.yml').read_text()
         self.assertNotIn('vm_real_worker_smoke.py --execute', workflow)
+
+    def test_mock_adapter_rejects_symlinked_helper(self):
+        import tempfile
+        entry = load('vm_mock_transaction_worker')
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp)
+            fake = directory / 'real-helper'
+            fake.write_text('#!/usr/bin/python3\n')
+            fake.chmod(0o700)
+            (directory / 'mock-helper').symlink_to(fake)
+            with patch.object(entry.os, 'geteuid', return_value=0), \
+                 patch.object(entry, 'allowed_vm', return_value=True), \
+                 patch.object(entry.supervisor, 'run_worker') as worker, \
+                 self.assertRaises(ValueError):
+                entry.main(['a'*32, str(directory), str(directory / 'mock-helper')])
+            worker.assert_not_called()
+
+    def test_mock_adapter_rejects_symlinked_directory(self):
+        import tempfile
+        entry = load('vm_mock_transaction_worker')
+        with tempfile.TemporaryDirectory() as tmp:
+            original = Path(tmp) / 'real'
+            original.mkdir()
+            (original / 'mock-helper').write_text('#!/usr/bin/python3\n')
+            link = Path(tmp) / 'shortcut'
+            link.symlink_to(original, target_is_directory=True)
+            with patch.object(entry.os, 'geteuid', return_value=0), \
+                 patch.object(entry, 'allowed_vm', return_value=True), \
+                 patch.object(entry.supervisor, 'run_worker') as worker, \
+                 self.assertRaises(ValueError):
+                entry.main(['a'*32, str(link), str(link / 'mock-helper')])
+            worker.assert_not_called()
+
+    def test_mock_adapter_rejects_world_readable_directory(self):
+        import tempfile
+        entry = load('vm_mock_transaction_worker')
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp)
+            helper = directory / 'mock-helper'
+            helper.write_text('#!/usr/bin/python3\n')
+            helper.chmod(0o700)
+            directory.chmod(0o755)
+            with patch.object(entry.os, 'geteuid', return_value=0), \
+                 patch.object(entry, 'allowed_vm', return_value=True), \
+                 patch.object(entry.supervisor, 'run_worker') as worker, \
+                 self.assertRaises(ValueError):
+                entry.main(['a'*32, tmp, str(helper)])
+            worker.assert_not_called()

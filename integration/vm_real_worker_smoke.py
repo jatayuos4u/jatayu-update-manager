@@ -8,6 +8,7 @@ import argparse
 import json
 import os
 from pathlib import Path
+import stat
 import subprocess
 import sys
 import tempfile
@@ -56,12 +57,15 @@ def run_case(exit_code):
         raise ValueError('Only fixed fake exit codes are allowed')
     with tempfile.TemporaryDirectory(prefix='jatayu-worker-mock-') as temp:
         directory = Path(temp)
+        directory.chmod(0o700)
         helper = directory / 'mock-helper'
         helper.write_text(
             '#!/usr/bin/python3\nimport sys,time\n'
             'time.sleep(2)\nsys.exit(' + str(exit_code) + ')\n',
             encoding='utf-8')
         helper.chmod(0o700)
+        if helper.stat().st_uid != 0:
+            raise RuntimeError('Mock helper not root-owned')
         identifier = uuid.uuid4().hex
         command = build_service_command(identifier, directory)
         controller_program = (

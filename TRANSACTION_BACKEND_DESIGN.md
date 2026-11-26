@@ -85,3 +85,7 @@ An explicitly gated harness checks whether a harmless systemd transient service 
 ## Stage A17 — VM actual-worker harness, not yet VM-tested
 
 The new `integration/vm_real_worker_smoke.py` starts the project's own `supervisor.run_worker` through a transient systemd unit with a hard-gated isolated mock-helper adapter. It is designed to observe a running status, kill the launcher process, and verify the final worker journal for both return code 0 and 42. It requires root and a disposable Debian 13 VM. GitHub CI validates only the harness gates and packaging and does **not** run a real systemd manager. A real APT/Polkit transaction is not exercised; stable release remains blocked.
+
+## Stage A18 — mock adapter path hardening
+
+The VM adapter now rejects symbolic-link paths **before resolution**, validates the helper is a regular single-link root-owned executable with no group/world permissions, and requires a root-owned private test directory. Regression tests ensure no worker is invoked when symlinks or loose permissions are provided. This narrows the risk of a misleading or unsafe test harness; it does **not** constitute a completed real-VM test. Live systemd, Polkit and package-transaction fault injection are still required.

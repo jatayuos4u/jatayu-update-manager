@@ -1,3 +1,12 @@
+jatayu-update-manager (1.2.3~alpha18-1) unstable; urgency=medium
+
+  * Reject mock-helper symlinks before resolving VM test paths.
+  * Require root-owned, private, executable mock-helper and directory.
+  * Add regression tests for symlink and unsafe-directory rejection.
+  * Retain mock-only VM integration and normal RC2-backed update controls.
+
+ -- JatayuOS Team <maintainers@jatayuos.in>  Fri, 27 Nov 2026 00:10:00 +0530
+
 jatayu-update-manager (1.2.3~alpha17-1) unstable; urgency=medium
 
   * Add disposable-VM integration harness for actual supervised worker code.
