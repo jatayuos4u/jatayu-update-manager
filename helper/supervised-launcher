@@ -36,7 +36,7 @@ def main(argv=None):
         if owner is None or not owner.isascii() or not owner.isdecimal():
             raise ValueError('Missing authenticated caller identity')
         identifier = start_supervised(action, digest, owner_uid=int(owner))
-    except (OSError, ValueError) as exc:
+    except (OSError, ValueError, RuntimeError, BlockingIOError) as exc:
         print('Unable to start supervised transaction: ' + str(exc), file=sys.stderr)
         return 3
     # The ID is a locator, not a cryptographic authentication token.
