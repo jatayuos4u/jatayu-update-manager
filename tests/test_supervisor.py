@@ -225,3 +225,67 @@ class SupervisorTests(unittest.TestCase):
         self.assertEqual(argv.count('--property=KillMode=control-group'), 1)
         self.assertIn('--property=SendSIGKILL=yes', argv)
         self.assertEqual(argv[argv.index('--')+1], s.WORKER)
+
+    def test_stale_running_transaction_blocks_new_worker_across_ids(self):
+        with tempfile.TemporaryDirectory() as tmp, \
+             patch.object(s.os, 'geteuid', return_value=0), \
+             patch.object(s.subprocess, 'run') as runner:
+            s.write_status('a'*32, 'upgrade', 'running', directory=tmp)
+            code = s.run_worker('b'*32, 'refresh', '-', directory=tmp)
+            self.assertEqual(code, s.UNRESOLVED_EXIT)
+            runner.assert_not_called()
+            previous = json.loads(s.status_path('a'*32, tmp).read_text())
+            current = json.loads(s.status_path('b'*32, tmp).read_text())
+            self.assertEqual(previous['state'], 'running')
+            self.assertEqual((current['state'], current['exit_code']),
+                             ('failed', s.UNRESOLVED_EXIT))
+
+    def test_finished_previous_transaction_allows_new_worker(self):
+        with tempfile.TemporaryDirectory() as tmp, \
+             patch.object(s.os, 'geteuid', return_value=0), \
+             patch.object(s.subprocess, 'run', return_value=Mock(returncode=0)) as runner:
+            s.write_status('a'*32, 'refresh', 'completed', 0, directory=tmp)
+            self.assertEqual(s.run_worker('b'*32, 'refresh', '-', directory=tmp), 0)
+            runner.assert_called_once()
+            current = json.loads(s.status_path('b'*32, tmp).read_text())
+            self.assertEqual(current['state'], 'completed')
+
+    def test_malformed_journal_blocks_new_worker(self):
+        with tempfile.TemporaryDirectory() as tmp, \
+             patch.object(s.os, 'geteuid', return_value=0), \
+             patch.object(s.subprocess, 'run') as runner:
+            (Path(tmp) / ('a'*32+'.json')).write_text('invalid-json')
+            self.assertEqual(s.run_worker('b'*32, 'refresh', '-', directory=tmp),
+                             s.UNRESOLVED_EXIT)
+            runner.assert_not_called()
+
+    def test_symlinked_journal_blocks_new_worker(self):
+        with tempfile.TemporaryDirectory() as tmp, \
+             patch.object(s.os, 'geteuid', return_value=0), \
+             patch.object(s.subprocess, 'run') as runner:
+            victim = Path(tmp) / 'unrelated'
+            victim.write_text('unrelated')
+            (Path(tmp) / ('a'*32+'.json')).symlink_to(victim)
+            self.assertEqual(s.run_worker('b'*32, 'refresh', '-', directory=tmp),
+                             s.UNRESOLVED_EXIT)
+            runner.assert_not_called()
+            self.assertEqual(victim.read_text(), 'unrelated')
+
+    def test_duplicate_transaction_id_is_refused_without_helper(self):
+        with tempfile.TemporaryDirectory() as tmp, \
+             patch.object(s.os, 'geteuid', return_value=0), \
+             patch.object(s.subprocess, 'run') as runner:
+            s.write_status('a'*32, 'refresh', 'running', directory=tmp)
+            self.assertEqual(s.run_worker('a'*32, 'refresh', '-', directory=tmp),
+                             s.UNRESOLVED_EXIT)
+            runner.assert_not_called()
+            self.assertEqual(json.loads(s.status_path('a'*32, tmp).read_text())['state'],
+                             'failed')
+
+    def test_journal_record_count_limit_is_fail_closed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            with patch.object(s, 'MAX_TRANSACTION_RECORDS', 1):
+                s.write_status('a'*32, 'refresh', 'completed', 0, directory=tmp)
+                s.write_status('b'*32, 'refresh', 'completed', 0, directory=tmp)
+                with self.assertRaises(RuntimeError):
+                    s.ensure_no_unresolved_transactions(tmp)

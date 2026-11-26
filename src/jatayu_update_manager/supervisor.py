@@ -225,6 +225,39 @@ def start_supervised(action, digest='-', owner_uid=None):
         return identifier
 
 
+MAX_TRANSACTION_RECORDS = 4096
+UNRESOLVED_EXIT = 76
+
+
+def ensure_no_unresolved_transactions(directory=STATE_DIR):
+    """Hold the global worker lock before checking historical status.
+
+    If a worker dies during APT, the kernel releases the flock while its
+    journal may still say 'running'. Reject subsequent operations globally
+    across users until an administrator verifies package integrity.
+    """
+    from .status_reader import read_status
+    directory = prepare_state_directory(directory)
+    count = 0
+    with os.scandir(directory) as entries:
+        for entry in entries:
+            name = entry.name
+            if not name.endswith('.json'):
+                continue
+            count += 1
+            if count > MAX_TRANSACTION_RECORDS:
+                raise RuntimeError('Transaction journal requires administrator review')
+            identifier = name[:-5]
+            if not _ID.fullmatch(identifier):
+                raise RuntimeError('Unrecognized transaction status entry')
+            try:
+                record = read_status(identifier, directory=directory)
+            except (OSError, ValueError) as exc:
+                raise RuntimeError('Unsafe transaction journal; review required') from exc
+            if record['state'] == 'running':
+                raise RuntimeError('Previous transaction remains unresolved')
+
+
 def run_worker(identifier, action, digest, directory=STATE_DIR):
     """Launched by systemd, not directly by the user desktop process."""
     if os.geteuid() != 0:
@@ -236,6 +269,14 @@ def run_worker(identifier, action, digest, directory=STATE_DIR):
         if not acquired:
             write_status(identifier, action, 'failed', exit_code=BUSY_EXIT, directory=directory)
             return BUSY_EXIT
+        # Do not start APT if *any* previous root worker may have died
+        # mid-transaction, even when it belonged to another desktop user.
+        try:
+            ensure_no_unresolved_transactions(directory)
+        except (OSError, RuntimeError):
+            write_status(identifier, action, 'failed', exit_code=UNRESOLVED_EXIT,
+                         directory=directory)
+            return UNRESOLVED_EXIT
         write_status(identifier, action, 'running', directory=directory)
         cmd = [HELPER, action] + ([digest] if action == 'upgrade' else [])
         try:

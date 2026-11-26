@@ -1,3 +1,13 @@
+jatayu-update-manager (1.2.3~alpha22-1) unstable; urgency=medium
+
+  * Block supervised transactions globally when an earlier worker left unresolved state.
+  * Enforce status-journal inspection while holding the worker's transaction lock.
+  * Refuse malformed, symlinked and excessive transaction journals before APT starts.
+  * Add cross-transaction regression coverage without executing real APT.
+  * Preserve existing RC2 update controls and developer-only supervised mode.
+
+ -- JatayuOS Team <maintainers@jatayuos.in>  Thu, 26 Nov 2026 23:45:00 +0530
+
 jatayu-update-manager (1.2.3~alpha21-1) unstable; urgency=medium
 
   * Set explicit systemd control-group lifecycle for supervised APT workers.
