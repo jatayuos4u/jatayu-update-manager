@@ -1,3 +1,13 @@
+jatayu-update-manager (1.2.3~alpha15-1) unstable; urgency=medium
+
+  * Audit built Debian package contents, not source manifests alone.
+  * Verify all three privileged helper and Polkit policy paths match.
+  * Require explicit administrator authentication and deny inactive or remote sessions.
+  * Reject world-writable, setuid/setgid, or writable privileged archive entries.
+  * Keep experimental supervised service off by default and retain RC2 update path.
+
+ -- JatayuOS Team <maintainers@jatayuos.in>  Thu, 26 Nov 2026 23:20:00 +0530
+
 jatayu-update-manager (1.2.3~alpha14-1) unstable; urgency=medium
 
   * Introduce explicit Polkit-authenticated read-only lost-ID recovery.
