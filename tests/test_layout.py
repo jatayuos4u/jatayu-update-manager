@@ -57,7 +57,8 @@ class UpdateListLayoutTests(unittest.TestCase):
         labels = dialog.findChildren(__import__('PyQt6.QtWidgets', fromlist=['QLabel']).QLabel)
         visible_text = ' '.join(label.text() for label in labels)
         self.assertIn('Anup Kumar Yadav', visible_text)
-        self.assertIn('1.2.2', visible_text)
+        from jatayu_update_manager import __version__
+        self.assertIn(__version__.replace('rc', ' RC'), visible_text)
         dialog.close()
 
     def test_about_menu_localizes(self):
