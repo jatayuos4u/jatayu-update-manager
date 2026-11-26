@@ -1,3 +1,13 @@
+jatayu-update-manager (1.2.3~alpha4-1) unstable; urgency=medium
+
+  * Add read-only, bounded, no-symlink transaction status retrieval.
+  * Reject malformed or unsafe status files before presentation.
+  * Classify pre-reboot unfinished work as interrupted with unknown outcome.
+  * Avoid claiming success or active APT execution from stale running records.
+  * Keep privileged service launcher and GUI integration disabled pending review.
+
+ -- JatayuOS Team <maintainers@jatayuos.in>  Thu, 26 Nov 2026 21:00:00 +0530
+
 jatayu-update-manager (1.2.3~alpha3-1) unstable; urgency=medium
 
   * Add cross-process single-flight lock held for entire supervised transaction.
