@@ -79,3 +79,36 @@ class UpdateListLayoutTests(unittest.TestCase):
         self.assertIn('StartupWMClass=jatayu-update-manager', desktop)
         self.assertIn('viewBox="0 0 256 256"', svg)
         self.assertIn('usr/share/icons/hicolor/scalable/apps', rules)
+
+    def test_untracked_transaction_diagnostic_does_not_modify_packages(self):
+        from unittest.mock import patch
+        self.window.settings.remove('supervised_transaction_id')
+        with patch('jatayu_update_manager.main.read_status') as reader:
+            text = self.window.supervised_status_text()
+            reader.assert_not_called()
+        self.assertIn('No supervised transaction', text)
+
+    def test_interrupted_transaction_is_reported_as_unknown(self):
+        from unittest.mock import patch
+        self.window.settings.setValue('supervised_transaction_id', 'a' * 32)
+        record = {'state': 'running', 'boot_id': 'a' * 36, 'exit_code': None}
+        with patch('jatayu_update_manager.main.read_status', return_value=record), \
+             patch('jatayu_update_manager.main.classify_status', return_value='interrupted_unknown'):
+            text = self.window.supervised_status_text()
+        self.assertIn('outcome is unknown', text)
+        self.window.settings.remove('supervised_transaction_id')
+
+    def test_corrupt_transaction_record_fails_closed(self):
+        from unittest.mock import patch
+        self.window.settings.setValue('supervised_transaction_id', 'a' * 32)
+        with patch('jatayu_update_manager.main.read_status',
+                   side_effect=ValueError('malformed')):
+            text = self.window.supervised_status_text()
+        self.assertIn('could not be verified', text)
+        self.window.settings.remove('supervised_transaction_id')
+
+    def test_transaction_status_menu_localizes(self):
+        self.assertIn('Transaction status', self.window.transaction_status_action.text())
+        self.window.lang = 'hi'
+        self.window.translate_ui()
+        self.assertIn('लेन-देन', self.window.transaction_status_action.text())

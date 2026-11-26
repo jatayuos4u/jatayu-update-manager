@@ -4,6 +4,7 @@ from pathlib import Path
 from PyQt6.QtCore import Qt, QProcess, QSettings, QSize, QUrl
 from PyQt6.QtGui import QIcon, QAction, QDesktopServices
 from .transaction import parse_simulation, SimulationError
+from .status_reader import read_status, classify_status, InvalidStatus
 from PyQt6.QtWidgets import (QApplication, QComboBox, QFrame, QHBoxLayout, QLabel,
     QMainWindow, QMessageBox, QPushButton, QProgressBar, QTabWidget, QTableWidget,
     QTableWidgetItem, QTextEdit, QVBoxLayout, QWidget, QHeaderView, QAbstractItemView, QStackedWidget, QLineEdit, QStyle, QSizePolicy, QToolButton, QMenu, QDialog, QDialogButtonBox, QFormLayout)
@@ -106,11 +107,13 @@ class MainWindow(QMainWindow):
         self.help_action = QAction(self)
         self.issue_action = QAction(self)
         self.license_action = QAction(self)
+        self.transaction_status_action = QAction(self)
+        self.transaction_status_action.triggered.connect(self.show_transaction_status)
         self.about_action.triggered.connect(self.show_about)
         self.help_action.triggered.connect(self.show_help)
         self.issue_action.triggered.connect(self.open_issues)
         self.license_action.triggered.connect(self.show_license)
-        for action in (self.about_action, self.help_action, self.issue_action, self.license_action):
+        for action in (self.about_action, self.help_action, self.issue_action, self.license_action, self.transaction_status_action):
             self.app_menu.addAction(action)
         header.addWidget(self.menu_button)
         outer.addLayout(header)
@@ -310,7 +313,8 @@ class MainWindow(QMainWindow):
         self.menu_button.setToolTip(self.t('menu'))
         self.menu_button.setAccessibleName(self.t('menu'))
         for action, key in ((self.about_action, 'about'), (self.help_action, 'help'),
-                            (self.issue_action, 'report_issue'), (self.license_action, 'license_credits')):
+                            (self.issue_action, 'report_issue'), (self.license_action, 'license_credits'),
+                            (self.transaction_status_action, 'transaction_status')):
             action.setText(self.t(key))
         self.title_label.setText(self.t('title'))
         self.subtitle_label.setText(self.t('subtitle'))
@@ -371,6 +375,32 @@ class MainWindow(QMainWindow):
         buttons.rejected.connect(dialog.reject)
         layout.addWidget(buttons)
         return dialog
+
+    def supervised_status_text(self):
+        """Read-only diagnostic; never interpret a status record as package health.
+
+        Alpha 6 does not start supervised transactions. An ID may be saved by
+        an authorized future flow, but the status is always revalidated.
+        """
+        identifier = self.settings.value('supervised_transaction_id', '')
+        if not identifier:
+            return self.t('transaction_not_tracked')
+        try:
+            record = read_status(str(identifier))
+            state = classify_status(record)
+        except (OSError, ValueError, InvalidStatus):
+            return self.t('transaction_unavailable')
+        if state == 'completed':
+            return self.t('transaction_completed_unverified')
+        if state == 'failed':
+            return self.t('transaction_failed', code=record['exit_code'])
+        if state == 'interrupted_unknown':
+            return self.t('transaction_interrupted')
+        return self.t('transaction_running_unverified')
+
+    def show_transaction_status(self):
+        QMessageBox.information(self, self.t('transaction_status'),
+                                self.supervised_status_text())
 
     def show_about(self):
         self.build_about_dialog().exec()
