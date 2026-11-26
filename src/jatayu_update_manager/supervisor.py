@@ -1,6 +1,6 @@
 """Development-only backend: root-owned, systemd-supervised APT worker.
 
-Not wired into the GUI in alpha3. Intended to establish privilege boundaries,
+Not wired into the GUI in alpha5. Intended to establish privilege boundaries,
 persistent final status and tests without changing the functioning RC2 path.
 """
 import fcntl
@@ -19,6 +19,7 @@ STATE_DIR = Path('/var/lib/jatayu-update-manager/transactions')
 WORKER = '/usr/lib/jatayu-update-manager/transaction-worker'
 HELPER = '/usr/lib/jatayu-update-manager/privileged-helper'
 SYSTEMD_RUN = '/usr/bin/systemd-run'
+LAUNCH_ENV = {'PATH': '/usr/sbin:/usr/bin:/sbin:/bin', 'LANG': 'C.UTF-8', 'LC_ALL': 'C.UTF-8'}
 BUSY_EXIT = 75
 LOCK_FILENAME = '.transaction.lock'
 _ID = re.compile(r'[0-9a-f]{32}\Z')
@@ -143,7 +144,8 @@ def start_supervised(action, digest='-'):
         WORKER, identifier, action, digest,
     ]
     # A system service is independent of the desktop's QProcess lifetime.
-    subprocess.run(command, check=True, capture_output=True, text=True, timeout=30)
+    subprocess.run(command, check=True, capture_output=True, text=True,
+                   timeout=30, cwd='/', env=LAUNCH_ENV)
     return identifier
 
 

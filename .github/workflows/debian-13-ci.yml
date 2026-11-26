@@ -24,23 +24,23 @@ jobs:
         run: |
           PYTHONPATH=src python3 -m unittest discover -s tests -v
           python3 -m compileall -q src helper scripts
-          xmllint --noout polkit/in.jatayuos.update-manager.policy
+          xmllint --noout polkit/in.jatayuos.update-manager.policy polkit/in.jatayuos.update-manager.supervised.policy
           bandit -q -r src helper -s B404,B603,B607
       - name: Build Debian package
         run: dpkg-buildpackage -us -uc -b
       - name: Verify package metadata and security properties
         run: |
-          dpkg-deb --info ../jatayu-update-manager_1.2.3~alpha4-1_all.deb
-          dpkg-deb --contents ../jatayu-update-manager_1.2.3~alpha4-1_all.deb | grep -F 'privileged-helper'
+          dpkg-deb --info ../jatayu-update-manager_1.2.3~alpha5-1_all.deb
+          dpkg-deb --contents ../jatayu-update-manager_1.2.3~alpha5-1_all.deb | grep -F 'privileged-helper'
       - name: Stage Debian package
         run: |
           mkdir -p artifacts
-          cp ../jatayu-update-manager_1.2.3~alpha4-1_all.deb artifacts/
+          cp ../jatayu-update-manager_1.2.3~alpha5-1_all.deb artifacts/
           cd artifacts
-          sha256sum jatayu-update-manager_1.2.3~alpha4-1_all.deb > SHA256SUMS
+          sha256sum jatayu-update-manager_1.2.3~alpha5-1_all.deb > SHA256SUMS
       - name: Upload test artifacts
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: jatayu-update-manager-1.2.3-alpha4-recovery-tests
+          name: jatayu-update-manager-1.2.3-alpha5-authorized-launch-tests
           path: artifacts/
           if-no-files-found: error

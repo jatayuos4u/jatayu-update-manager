@@ -1,3 +1,12 @@
+jatayu-update-manager (1.2.3~alpha5-1) unstable; urgency=medium
+
+  * Add separately Polkit-authorized fixed-argument supervised launcher.
+  * Refuse malformed requests and unauthenticated launcher execution.
+  * Sanitize environment for systemd-run invocation and test launch failures.
+  * Keep GUI on existing 1.2.2-compatible update path.
+
+ -- JatayuOS Team <maintainers@jatayuos.in>  Thu, 26 Nov 2026 21:30:00 +0530
+
 jatayu-update-manager (1.2.3~alpha4-1) unstable; urgency=medium
 
   * Add read-only, bounded, no-symlink transaction status retrieval.

@@ -1,0 +1,44 @@
+#!/usr/bin/python3
+"""Dedicated, Polkit-protected launcher for a supervised APT transaction.
+
+EXPERIMENTAL: Not connected to the Qt GUI. Authorisation is performed by
+pkexec using a separate policy bound to this installed executable.
+"""
+import os
+import re
+import sys
+
+from jatayu_update_manager.supervisor import start_supervised
+
+
+def validate_args(args):
+    if args == ['refresh']:
+        return 'refresh', '-'
+    if (len(args) == 2 and args[0] == 'upgrade'
+            and re.fullmatch(r'[a-f0-9]{64}', args[1])):
+        return 'upgrade', args[1]
+    raise ValueError('Invalid supervised transaction request')
+
+
+def main(argv=None):
+    args = sys.argv[1:] if argv is None else argv
+    if os.geteuid() != 0:
+        print('Administrator authorization required.', file=sys.stderr)
+        return 1
+    try:
+        action, digest = validate_args(args)
+    except ValueError:
+        print('Invalid supervised transaction request.', file=sys.stderr)
+        return 2
+    try:
+        identifier = start_supervised(action, digest)
+    except (OSError, ValueError) as exc:
+        print('Unable to start supervised transaction: ' + str(exc), file=sys.stderr)
+        return 3
+    # The ID is a locator, not a cryptographic authentication token.
+    print('TRANSACTION_ID=' + identifier, flush=True)
+    return 0
+
+
+if __name__ == '__main__':
+    sys.exit(main())
