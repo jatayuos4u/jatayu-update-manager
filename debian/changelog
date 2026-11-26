@@ -1,3 +1,13 @@
+jatayu-update-manager (1.2.3~alpha12-1) unstable; urgency=medium
+
+  * Block handoff replacement until previous transaction has final state and inactive systemd unit.
+  * Fail closed when service liveness cannot be verified.
+  * Normalize signal-terminated helper return codes before persisting status.
+  * Validate consistency of running/completed/failed records at write time.
+  * Add recovery and abnormal termination tests without touching APT.
+
+ -- JatayuOS Team <maintainers@jatayuos.in>  Thu, 26 Nov 2026 21:55:00 +0530
+
 jatayu-update-manager (1.2.3~alpha11-1) unstable; urgency=medium
 
   * Prevent reusing a per-user recovery pointer while a transaction is unresolved.

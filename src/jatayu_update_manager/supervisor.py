@@ -1,6 +1,6 @@
 """Development-only backend: root-owned, systemd-supervised APT worker.
 
-Not wired into the GUI in alpha5. Intended to establish privilege boundaries,
+Supervised refresh remains developer-only; normal update buttons are unchanged. Intended to establish privilege boundaries,
 persistent final status and tests without changing the functioning RC2 path.
 """
 import fcntl
@@ -93,8 +93,15 @@ def write_status(identifier, action, state, exit_code=None, directory=STATE_DIR)
     validate_request(identifier, action, '-' if action == 'refresh' else '0' * 64)
     if state not in ('running', 'completed', 'failed'):
         raise ValueError('Invalid state')
-    if exit_code is not None and (not isinstance(exit_code, int) or isinstance(exit_code, bool)):
-        raise ValueError('Invalid exit code')
+    if state == 'running':
+        if exit_code is not None:
+            raise ValueError('Running status cannot have an exit code')
+    elif type(exit_code) is not int or not 0 <= exit_code <= 255:
+        raise ValueError('Terminal status must have a valid exit code')
+    if state == 'completed' and exit_code != 0:
+        raise ValueError('A completed transaction requires exit code zero')
+    if state == 'failed' and exit_code == 0:
+        raise ValueError('Failed transactions require a nonzero exit code')
     directory = prepare_state_directory(directory)
     record = {'id': identifier, 'action': action, 'state': state, 'exit_code': exit_code,
               'updated_utc': datetime.now(timezone.utc).isoformat(),
@@ -185,6 +192,13 @@ def run_worker(identifier, action, digest, directory=STATE_DIR):
             result = subprocess.run(cmd, check=False, cwd='/', timeout=None)
             code = result.returncode
         except OSError:
+            code = 1
+        # Python uses negative exit codes for processes killed by signals;
+        # translate those to conventional 128+signal before persisting.
+        # The status-reader must never see a malformed negative exit code.
+        if code < 0:
+            code = min(255, 128 - code)
+        elif code > 255:
             code = 1
         write_status(identifier, action, 'completed' if code == 0 else 'failed',
                      exit_code=code, directory=directory)

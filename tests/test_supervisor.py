@@ -125,3 +125,22 @@ class SupervisorTests(unittest.TestCase):
             directory.chmod(0o777)
             with self.assertRaises(OSError):
                 s.write_status('a' * 32, 'refresh', 'running', directory=directory)
+
+    def test_signal_killed_helper_records_valid_failed_exit(self):
+        with tempfile.TemporaryDirectory() as tmp, \
+             patch.object(s.os, 'geteuid', return_value=0), \
+             patch.object(s.subprocess, 'run', return_value=Mock(returncode=-9)):
+            result = s.run_worker('c'*32, 'refresh', '-', directory=tmp)
+            record = json.loads(s.status_path('c'*32, tmp).read_text())
+            self.assertEqual(result, 137)
+            self.assertEqual((record['state'], record['exit_code']), ('failed', 137))
+            from jatayu_update_manager.status_reader import read_status
+            self.assertEqual(read_status('c'*32, tmp)['exit_code'], 137)
+
+    def test_write_status_rejects_inconsistent_terminal_records(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            bad = [('completed', 1), ('failed', 0), ('running', 0),
+                   ('failed', -9), ('failed', 256), ('failed', None)]
+            for state, code in bad:
+                with self.subTest(state=state, code=code), self.assertRaises(ValueError):
+                    s.write_status('d'*32, 'refresh', state, code, tmp)

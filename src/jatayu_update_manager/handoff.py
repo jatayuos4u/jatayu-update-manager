@@ -125,5 +125,11 @@ def ensure_no_unresolved_handoff(uid, directory=STATE_DIR):
         raise RuntimeError('Previous transaction needs inspection') from exc
     if status['state'] not in ('completed', 'failed'):
         raise RuntimeError('Previous transaction has no final status')
-    # A final record is not proof of package integrity, but the pointer can
-    # be superseded after the supervisor has recorded a terminal result.
+    from .status_reader import check_worker_unit
+    # A terminal JSON report is not a service-liveness attestation. Do not
+    # overwrite the pointer while its transient systemd unit is still active,
+    # or if querying systemd fails and we cannot determine its state.
+    if check_worker_unit(previous['id']) != 'inactive':
+        raise RuntimeError('Previous transaction service is not confirmed inactive')
+    # A terminal record with an inactive worker is still not proof that
+    # packages are healthy; users must resolve APT failures separately.

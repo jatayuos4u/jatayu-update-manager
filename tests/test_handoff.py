@@ -76,6 +76,8 @@ class HandoffTests(unittest.TestCase):
              patch.object(handoff.os, 'geteuid', return_value=0):
             handoff.write_handoff(1000, 'a'*32, 'pending', tmp)
             with self.assertRaises(RuntimeError):
+                with patch('jatayu_update_manager.status_reader.check_worker_unit',
+                       return_value='inactive'):
                 handoff.ensure_no_unresolved_handoff(1000, tmp)
             self.assertEqual(handoff.read_handoff(1000, tmp)['id'], 'a'*32)
 
@@ -106,3 +108,26 @@ class HandoffTests(unittest.TestCase):
                         pass
             with handoff.handoff_launch_lock(1000, tmp):
                 pass
+
+    def test_terminal_record_but_active_unit_blocks_overwrite(self):
+        from jatayu_update_manager.supervisor import write_status
+        with tempfile.TemporaryDirectory() as tmp, \
+             patch.object(handoff.os, 'geteuid', return_value=0):
+            handoff.write_handoff(1000, 'e'*32, 'submitted', tmp)
+            write_status('e'*32, 'refresh', 'completed', 0, directory=tmp)
+            for state in ('active', 'unknown'):
+                with self.subTest(service=state), \
+                     patch('jatayu_update_manager.status_reader.check_worker_unit',
+                           return_value=state), \
+                     self.assertRaises(RuntimeError):
+                    handoff.ensure_no_unresolved_handoff(1000, tmp)
+
+    def test_terminal_record_and_inactive_unit_allows_new_request(self):
+        from jatayu_update_manager.supervisor import write_status
+        with tempfile.TemporaryDirectory() as tmp, \
+             patch.object(handoff.os, 'geteuid', return_value=0):
+            handoff.write_handoff(1000, 'f'*32, 'submitted', tmp)
+            write_status('f'*32, 'refresh', 'failed', 100, directory=tmp)
+            with patch('jatayu_update_manager.status_reader.check_worker_unit',
+                       return_value='inactive'):
+                handoff.ensure_no_unresolved_handoff(1000, tmp)
