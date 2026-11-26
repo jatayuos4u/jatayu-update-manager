@@ -1,3 +1,13 @@
+jatayu-update-manager (1.2.3~alpha3-1) unstable; urgency=medium
+
+  * Add cross-process single-flight lock held for entire supervised transaction.
+  * Refuse overlapping worker transactions without invoking APT.
+  * Include boot identity and update timestamp in atomic status records.
+  * Reject unsafe status-directory and lock-file permissions.
+  * Keep GUI on the existing verified transaction path.
+
+ -- JatayuOS Team <maintainers@jatayuos.in>  Thu, 26 Nov 2026 20:30:00 +0530
+
 jatayu-update-manager (1.2.3~alpha2-1) unstable; urgency=medium
 
   * Prototype opt-in systemd-supervised root transaction worker.

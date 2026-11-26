@@ -25,3 +25,7 @@ The shipped 1.2.2 RC2 starts `pkexec privileged-helper` as a GUI-owned Qt proces
 ## Stage A2 — supervised worker prototype
 
 A root-only, opt-in `systemd-run --system` launcher and standalone worker are included **without GUI integration**. The worker invokes the existing validated helper, emits a minimal atomic transaction status file under `/var/lib/jatayu-update-manager/transactions/`, and runs under a transient systemd unit rather than the GUI. This prototype does **not** yet implement recovery reconciliation, proper cross-service single-flight, full journal authentication, reliable active-state reporting or crash tests. No stable use is approved. The worker is shipped solely to support controlled root-only backend testing; do not expose the launcher via a desktop entry.
+
+## Stage A3 — worker serialization
+
+The prototype now holds a private root-owned POSIX `flock` for the entire worker operation, including helper invocation and status completion; competing workers fail without launching APT. Tests exercise contention from independent processes and verify that the lock releases. Status records include boot identity and last-updated UTC. This worker-level lock **does not** prevent external package managers from running; APT's native locking still governs cross-application contention. It also cannot yet classify a worker killed while its status reads `running`: a recovery reconciler and GUI reconnect mechanism are outstanding.

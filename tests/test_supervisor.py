@@ -1,6 +1,8 @@
 """No real APT invocation: supervised backend behavior tests."""
+import fcntl
 import json
 import os
+import subprocess
 from pathlib import Path
 import tempfile
 import unittest
@@ -67,3 +69,59 @@ class SupervisorTests(unittest.TestCase):
             self.assertIn(s.WORKER, command)
             self.assertEqual(command[-3:], [transaction, 'refresh', '-'])
             self.assertTrue(runner.call_args.kwargs['check'])
+
+    def test_singleflight_lock_releases_after_operation(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            with s.single_transaction(tmp) as acquired:
+                self.assertTrue(acquired)
+            with s.single_transaction(tmp) as acquired:
+                self.assertTrue(acquired)
+
+    def test_two_workers_cannot_overlap(self):
+        """Cross-process flock proof; never starts real APT."""
+        with tempfile.TemporaryDirectory() as tmp:
+            with s.single_transaction(tmp) as first:
+                self.assertTrue(first)
+                # Mock worker root check; second process is distinct.
+                code = (
+                    'import sys; '
+                    'from jatayu_update_manager import supervisor as s; '
+                    'with_lock = s.single_transaction(sys.argv[1]); '
+                    'value = with_lock.__enter__(); print(value, flush=True); '
+                    'with_lock.__exit__(None, None, None)'
+                )
+                env = dict(os.environ)
+                # Existing test runner runs with PYTHONPATH=src.
+                result = subprocess.run(
+                    ['/usr/bin/python3', '-c', code, tmp],
+                    capture_output=True, text=True, timeout=5, env=env,
+                )
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(result.stdout.strip(), 'False')
+            with s.single_transaction(tmp) as released:
+                self.assertTrue(released)
+
+    def test_busy_worker_never_invokes_helper(self):
+        with tempfile.TemporaryDirectory() as tmp, \
+             patch.object(s.os, 'geteuid', return_value=0), \
+             patch.object(s.subprocess, 'run') as runner:
+            with s.single_transaction(tmp):
+                code = s.run_worker('b' * 32, 'refresh', '-', directory=tmp)
+            self.assertEqual(code, s.BUSY_EXIT)
+            runner.assert_not_called()
+            record = json.loads(s.status_path('b' * 32, tmp).read_text())
+            self.assertEqual((record['state'], record['exit_code']), ('failed', s.BUSY_EXIT))
+
+    def test_status_has_boot_and_timestamp(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            data = s.write_status('a' * 32, 'refresh', 'running', directory=tmp)
+            self.assertIn('boot_id', data)
+            self.assertIn('updated_utc', data)
+
+    def test_unsafe_world_writable_status_directory_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp) / 'unsafe'
+            directory.mkdir(mode=0o777)
+            directory.chmod(0o777)
+            with self.assertRaises(OSError):
+                s.write_status('a' * 32, 'refresh', 'running', directory=directory)

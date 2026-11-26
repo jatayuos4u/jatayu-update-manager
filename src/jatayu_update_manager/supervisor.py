@@ -1,12 +1,16 @@
 """Development-only backend: root-owned, systemd-supervised APT worker.
 
-Not wired into the GUI in alpha2. Intended to establish privilege boundaries,
+Not wired into the GUI in alpha3. Intended to establish privilege boundaries,
 persistent final status and tests without changing the functioning RC2 path.
 """
+import fcntl
 import json
+from contextlib import contextmanager
+from datetime import datetime, timezone
 import os
 from pathlib import Path
 import re
+import stat
 import subprocess
 import tempfile
 import uuid
@@ -15,6 +19,8 @@ STATE_DIR = Path('/var/lib/jatayu-update-manager/transactions')
 WORKER = '/usr/lib/jatayu-update-manager/transaction-worker'
 HELPER = '/usr/lib/jatayu-update-manager/privileged-helper'
 SYSTEMD_RUN = '/usr/bin/systemd-run'
+BUSY_EXIT = 75
+LOCK_FILENAME = '.transaction.lock'
 _ID = re.compile(r'[0-9a-f]{32}\Z')
 _DIGEST = re.compile(r'[0-9a-f]{64}\Z')
 
@@ -35,6 +41,52 @@ def status_path(identifier, directory=STATE_DIR):
     return Path(directory) / (identifier + '.json')
 
 
+def prepare_state_directory(directory):
+    """Reject root status locations writable by untrusted users."""
+    directory = Path(directory)
+    directory.mkdir(mode=0o755, parents=True, exist_ok=True)
+    details = directory.lstat()
+    if not stat.S_ISDIR(details.st_mode) or (details.st_mode & 0o022):
+        raise OSError('Unsafe transaction state directory')
+    # A production worker runs as root. Existing state must also be root-owned.
+    if os.geteuid() == 0 and details.st_uid != 0:
+        raise OSError('Transaction state directory is not root-owned')
+    return directory
+
+
+@contextmanager
+def single_transaction(directory=STATE_DIR):
+    """OS-enforced lock, held by the worker across helper/APT execution.
+
+    Unlike dpkg's own lock, this never needs to be acquired by apt-get.
+    Contention fails closed. The kernel releases the lock if the worker dies.
+    """
+    directory = prepare_state_directory(directory)
+    path = directory / LOCK_FILENAME
+    flags = os.O_RDWR | os.O_CREAT | os.O_CLOEXEC | os.O_NOFOLLOW
+    fd = os.open(path, flags, 0o600)
+    locked = False
+    try:
+        metadata = os.fstat(fd)
+        if not stat.S_ISREG(metadata.st_mode) or metadata.st_nlink != 1:
+            raise OSError('Unsafe transaction lock file')
+        if os.geteuid() == 0 and metadata.st_uid != 0:
+            raise OSError('Transaction lock file is not root-owned')
+        if metadata.st_mode & 0o077:
+            raise OSError('Transaction lock permissions are too open')
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            locked = True
+        except BlockingIOError:
+            yield False
+            return
+        yield True
+    finally:
+        if locked:
+            fcntl.flock(fd, fcntl.LOCK_UN)
+        os.close(fd)
+
+
 def write_status(identifier, action, state, exit_code=None, directory=STATE_DIR):
     """Atomically replace a bounded, root-created status record."""
     validate_request(identifier, action, '-' if action == 'refresh' else '0' * 64)
@@ -42,12 +94,10 @@ def write_status(identifier, action, state, exit_code=None, directory=STATE_DIR)
         raise ValueError('Invalid state')
     if exit_code is not None and (not isinstance(exit_code, int) or isinstance(exit_code, bool)):
         raise ValueError('Invalid exit code')
-    directory = Path(directory)
-    directory.mkdir(mode=0o755, parents=True, exist_ok=True)
-    # Production worker must run as root; reject status-directory symlinks.
-    if directory.is_symlink():
-        raise OSError('Refusing symlink status directory')
-    record = {'id': identifier, 'action': action, 'state': state, 'exit_code': exit_code}
+    directory = prepare_state_directory(directory)
+    record = {'id': identifier, 'action': action, 'state': state, 'exit_code': exit_code,
+              'updated_utc': datetime.now(timezone.utc).isoformat(),
+              'boot_id': boot_id()}
     fd, tmp = tempfile.mkstemp(prefix='.status-', suffix='.tmp', dir=directory)
     try:
         with os.fdopen(fd, 'w', encoding='utf-8') as output:
@@ -66,6 +116,17 @@ def write_status(identifier, action, state, exit_code=None, directory=STATE_DIR)
         if os.path.exists(tmp):
             os.unlink(tmp)
     return record
+
+
+def boot_id():
+    """Identify the boot that produced a status record."""
+    try:
+        value = Path('/proc/sys/kernel/random/boot_id').read_text(encoding='ascii').strip()
+        if re.fullmatch(r'[a-f0-9-]{36}', value):
+            return value
+    except OSError:
+        pass
+    return 'unavailable'
 
 
 def start_supervised(action, digest='-'):
@@ -91,13 +152,19 @@ def run_worker(identifier, action, digest, directory=STATE_DIR):
     if os.geteuid() != 0:
         raise PermissionError('Root worker required')
     validate_request(identifier, action, digest)
-    write_status(identifier, action, 'running', directory=directory)
-    cmd = [HELPER, action] + ([digest] if action == 'upgrade' else [])
-    try:
-        result = subprocess.run(cmd, check=False, cwd='/', timeout=None)
-        code = result.returncode
-    except OSError:
-        code = 1
-    write_status(identifier, action, 'completed' if code == 0 else 'failed',
-                 exit_code=code, directory=directory)
-    return code
+    # The lock must be held continuously through preview, install and status
+    # completion. Different root worker processes cannot overlap each other.
+    with single_transaction(directory) as acquired:
+        if not acquired:
+            write_status(identifier, action, 'failed', exit_code=BUSY_EXIT, directory=directory)
+            return BUSY_EXIT
+        write_status(identifier, action, 'running', directory=directory)
+        cmd = [HELPER, action] + ([digest] if action == 'upgrade' else [])
+        try:
+            result = subprocess.run(cmd, check=False, cwd='/', timeout=None)
+            code = result.returncode
+        except OSError:
+            code = 1
+        write_status(identifier, action, 'completed' if code == 0 else 'failed',
+                     exit_code=code, directory=directory)
+        return code
