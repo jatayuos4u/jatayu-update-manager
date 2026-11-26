@@ -195,7 +195,15 @@ class SupervisorTests(unittest.TestCase):
             parent = Path(tmp) / 'jatayu-update-manager'
             target = parent / 'transactions'
             self.assertFalse(parent.exists())
-            with patch.object(s, 'STATE_DIR', target):
+            trusted_check = s.verify_trusted_directory
+            # The CI host's /tmp is intentionally world-writable; mock
+            # its ancestors as trusted while checking the actual test tree.
+            def check_test_component(component):
+                if component == Path(tmp) or Path(tmp) in component.parents:
+                    return trusted_check(component)
+                return component
+            with patch.object(s, 'STATE_DIR', target), \
+                 patch.object(s, 'verify_trusted_directory', side_effect=check_test_component):
                 result = s.prepare_state_directory(target)
             self.assertEqual(result, target)
             self.assertTrue(parent.is_dir())
