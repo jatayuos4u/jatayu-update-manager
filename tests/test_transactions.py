@@ -134,4 +134,6 @@ class PrivilegeTests(unittest.TestCase):
             finally:
                 owner.terminate()
                 owner.wait(timeout=3)
+                owner.stdout.close()
+                owner.stderr.close()
             self.assertTrue(helper.frontend_available(lock_path))
