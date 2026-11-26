@@ -9,8 +9,9 @@ import os
 from pathlib import Path
 import re
 import stat
+import subprocess
 
-from .supervisor import STATE_DIR, boot_id, status_path
+from .supervisor import STATE_DIR, WORKER, boot_id, status_path
 
 MAX_STATUS_BYTES = 4096
 _ID = re.compile(r'[0-9a-f]{32}\Z')
@@ -90,5 +91,73 @@ def classify_status(data, current_boot=None):
         current_boot = boot_id()
     if (current_boot != 'unavailable' and data['boot_id'] != 'unavailable'
             and current_boot != data['boot_id']):
+        return 'interrupted_unknown'
+    return 'running_unverified'
+
+
+SYSTEMCTL = '/usr/bin/systemctl'
+MAX_SYSTEMD_REPLY = 4096
+
+
+def check_worker_unit(identifier, runner=subprocess.run):
+    """Return active/inactive/unknown for exactly this systemd transaction unit.
+
+    Status is intentionally tri-state: a failed query must never be mistaken
+    for evidence of an interrupted transaction. Only the systemd system
+    manager can establish the live state; user-controlled status JSON cannot.
+    """
+    if not _ID.fullmatch(identifier):
+        raise InvalidStatus('Invalid transaction ID')
+    unit = 'jatayu-update-' + identifier + '.service'
+    argv = [SYSTEMCTL, '--system', '--no-pager', 'show',
+            '--property=LoadState', '--property=ActiveState',
+            '--property=ExecStart', unit]
+    try:
+        result = runner(argv, check=False, capture_output=True,
+                        timeout=2, env={'PATH': '/usr/sbin:/usr/bin:/sbin:/bin'})
+    except (OSError, subprocess.TimeoutExpired):
+        return 'unknown'
+    if len(result.stdout) > MAX_SYSTEMD_REPLY or result.returncode != 0:
+        return 'unknown'
+    try:
+        fields = {}
+        for line in result.stdout.decode('utf-8').splitlines():
+            key, separator, value = line.partition('=')
+            if not separator or key in fields:
+                return 'unknown'
+            fields[key] = value
+        if set(fields) != {'LoadState', 'ActiveState', 'ExecStart'}:
+            return 'unknown'
+    except UnicodeDecodeError:
+        return 'unknown'
+    if fields['LoadState'] == 'not-found':
+        return 'inactive'
+    if fields['LoadState'] != 'loaded':
+        return 'unknown'
+    # Check the configured executable, not just the selected unit name.
+    execstart = fields['ExecStart']
+    if ('path=' + WORKER + ' ' not in execstart
+            or (' ' + identifier + ' ') not in execstart):
+        return 'unknown'
+    if fields['ActiveState'] == 'active':
+        return 'active'
+    if fields['ActiveState'] in ('inactive', 'failed'):
+        return 'inactive'
+    return 'unknown'
+
+
+def reconcile_status(identifier, record, unit_state=None, current_boot=None):
+    """Classify running state using boot ID and verified systemd unit state.
+
+    A disappeared unit is *not* automatically a completed APT operation.
+    """
+    state = classify_status(record, current_boot=current_boot)
+    if state != 'running_unverified':
+        return state
+    if unit_state is None:
+        unit_state = check_worker_unit(identifier)
+    if unit_state == 'active':
+        return 'running_confirmed'
+    if unit_state == 'inactive':
         return 'interrupted_unknown'
     return 'running_unverified'

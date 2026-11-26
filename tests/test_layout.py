@@ -142,3 +142,14 @@ class UpdateListLayoutTests(unittest.TestCase):
              patch('jatayu_update_manager.main.QMessageBox.question') as question:
             self.window.start_supervised_refresh()
             question.assert_not_called()
+
+    def test_status_menu_distinguishes_active_worker(self):
+        from unittest.mock import patch
+        self.window.settings.setValue('supervised_transaction_id', 'a' * 32)
+        with patch('jatayu_update_manager.main.read_status',
+                   return_value={'state': 'running', 'boot_id': 'a' * 36}), \
+             patch('jatayu_update_manager.main.reconcile_status',
+                   return_value='running_confirmed'):
+            text = self.window.supervised_status_text()
+        self.assertIn('systemd worker is active', text)
+        self.window.settings.remove('supervised_transaction_id')

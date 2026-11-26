@@ -74,3 +74,45 @@ class StatusReaderTests(unittest.TestCase):
             identifier = 'c' * 32
             write_status(identifier, 'upgrade', 'failed', 75, directory=tmp)
             self.assertEqual(s.classify_status(s.read_status(identifier, tmp)), 'failed')
+
+    def test_systemd_unit_active_only_for_expected_worker(self):
+        from unittest.mock import Mock
+        from jatayu_update_manager.supervisor import WORKER
+        identifier = 'a' * 32
+        stdout = ('LoadState=loaded\nActiveState=active\n'
+                  'ExecStart={ path=' + WORKER + ' ; argv[]=' + WORKER
+                  + ' ' + identifier + ' refresh - ; }\n').encode()
+        runner = Mock(return_value=Mock(returncode=0, stdout=stdout))
+        self.assertEqual(s.check_worker_unit(identifier, runner), 'active')
+        self.assertEqual(runner.call_args.args[0][-1],
+                         'jatayu-update-' + identifier + '.service')
+
+    def test_systemd_unknown_when_unit_executable_differs(self):
+        from unittest.mock import Mock
+        identifier = 'a' * 32
+        stdout = ('LoadState=loaded\nActiveState=active\n'
+                  'ExecStart={ path=/bin/false ; argv[]=/bin/false '
+                  + identifier + ' ; }\n').encode()
+        runner = Mock(return_value=Mock(returncode=0, stdout=stdout))
+        self.assertEqual(s.check_worker_unit(identifier, runner), 'unknown')
+
+    def test_systemd_unavailable_does_not_claim_interrupted(self):
+        from unittest.mock import Mock
+        identifier = 'a' * 32
+        runner = Mock(side_effect=OSError('unavailable'))
+        self.assertEqual(s.check_worker_unit(identifier, runner), 'unknown')
+        record = {'state': 'running', 'boot_id': 'a' * 36}
+        self.assertEqual(s.reconcile_status(identifier, record,
+                         unit_state='unknown', current_boot='a' * 36), 'running_unverified')
+
+    def test_stale_running_and_inactive_unit_is_unknown_outcome(self):
+        identifier = 'a' * 32
+        record = {'state': 'running', 'boot_id': 'a' * 36}
+        self.assertEqual(s.reconcile_status(identifier, record,
+                         unit_state='inactive', current_boot='a' * 36), 'interrupted_unknown')
+
+    def test_active_unit_confirms_worker_not_upgrade_success(self):
+        identifier = 'a' * 32
+        record = {'state': 'running', 'boot_id': 'a' * 36}
+        self.assertEqual(s.reconcile_status(identifier, record,
+                         unit_state='active', current_boot='a' * 36), 'running_confirmed')

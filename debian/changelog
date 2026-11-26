@@ -1,3 +1,12 @@
+jatayu-update-manager (1.2.3~alpha8-1) unstable; urgency=medium
+
+  * Verify the active systemd unit against the expected root worker path.
+  * Distinguish active, inactive and unknown service queries conservatively.
+  * Never confuse an inactive worker or stale transaction record with success.
+  * Retain developer-only supervised refresh and existing normal APT backend.
+
+ -- JatayuOS Team <maintainers@jatayuos.in>  Thu, 26 Nov 2026 23:00:00 +0530
+
 jatayu-update-manager (1.2.3~alpha7-1) unstable; urgency=medium
 
   * Prototype opt-in developer-only supervised refresh launcher handshake.

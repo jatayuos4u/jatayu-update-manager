@@ -5,7 +5,7 @@ from pathlib import Path
 from PyQt6.QtCore import Qt, QProcess, QSettings, QSize, QUrl, QTimer
 from PyQt6.QtGui import QIcon, QAction, QDesktopServices
 from .transaction import parse_simulation, SimulationError
-from .status_reader import read_status, classify_status, InvalidStatus
+from .status_reader import read_status, reconcile_status, InvalidStatus
 from .supervised_protocol import parse_launcher_reply, MAX_LAUNCH_OUTPUT
 from PyQt6.QtWidgets import (QApplication, QComboBox, QFrame, QHBoxLayout, QLabel,
     QMainWindow, QMessageBox, QPushButton, QProgressBar, QTabWidget, QTableWidget,
@@ -459,7 +459,7 @@ class MainWindow(QMainWindow):
             self.supervised_timer.stop()
             return
         try:
-            state = classify_status(read_status(str(identifier)))
+            state = reconcile_status(str(identifier), read_status(str(identifier)))
         except (OSError, ValueError):
             # Status may not exist immediately after systemd-run returned.
             # Do not report completion or clear the ID on a missing record.
@@ -480,7 +480,7 @@ class MainWindow(QMainWindow):
             return self.t('transaction_not_tracked')
         try:
             record = read_status(str(identifier))
-            state = classify_status(record)
+            state = reconcile_status(str(identifier), record)
         except (OSError, ValueError, InvalidStatus):
             return self.t('transaction_unavailable')
         if state == 'completed':
@@ -489,6 +489,8 @@ class MainWindow(QMainWindow):
             return self.t('transaction_failed', code=record['exit_code'])
         if state == 'interrupted_unknown':
             return self.t('transaction_interrupted')
+        if state == 'running_confirmed':
+            return self.t('transaction_running_confirmed')
         return self.t('transaction_running_unverified')
 
     def show_transaction_status(self):
