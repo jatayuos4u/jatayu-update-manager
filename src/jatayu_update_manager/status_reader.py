@@ -117,7 +117,7 @@ def check_worker_unit(identifier, runner=subprocess.run):
                         timeout=2, env={'PATH': '/usr/sbin:/usr/bin:/sbin:/bin'})
     except (OSError, subprocess.TimeoutExpired):
         return 'unknown'
-    if len(result.stdout) > MAX_SYSTEMD_REPLY or result.returncode != 0:
+    if len(result.stdout) > MAX_SYSTEMD_REPLY:
         return 'unknown'
     try:
         fields = {}
@@ -131,13 +131,21 @@ def check_worker_unit(identifier, runner=subprocess.run):
     except UnicodeDecodeError:
         return 'unknown'
     if fields['LoadState'] == 'not-found':
-        return 'inactive'
-    if fields['LoadState'] != 'loaded':
+        # systemd --collect removes transient units after they finish.
+        # Accept a missing unit only when systemctl explicitly returned
+        # a consistent unloaded, inactive record. Some versions return 1.
+        if (result.returncode in (0, 1) and
+                fields['ActiveState'] == 'inactive' and
+                not fields['ExecStart'].strip()):
+            return 'inactive'
         return 'unknown'
-    # Check the configured executable, not just the selected unit name.
+    if result.returncode != 0 or fields['LoadState'] != 'loaded':
+        return 'unknown'
+    # Check the actual configured executable and argv, not merely whether
+    # these strings appear somewhere in unrelated systemd metadata.
     execstart = fields['ExecStart']
-    if ('path=' + WORKER + ' ' not in execstart
-            or (' ' + identifier + ' ') not in execstart):
+    expected_prefix = 'path=' + WORKER + ' ; argv[]=' + WORKER + ' ' + identifier + ' '
+    if expected_prefix not in execstart:
         return 'unknown'
     if fields['ActiveState'] == 'active':
         return 'active'

@@ -1,3 +1,12 @@
+jatayu-update-manager (1.2.3~alpha20-1) unstable; urgency=medium
+
+  * Handle collected transient systemd units after worker completion.
+  * Recognize missing units only with explicit inactive and empty ExecStart fields.
+  * Keep ambiguous systemctl errors fail-closed; reject misleading argv matches.
+  * Add unit-state and recovery regression coverage, keeping RC2 update path intact.
+
+ -- JatayuOS Team <maintainers@jatayuos.in>  Thu, 26 Nov 2026 23:00:00 +0530
+
 jatayu-update-manager (1.2.3~alpha19-1) unstable; urgency=medium
 
   * Fail closed if the production state directory's parent path is untrusted.

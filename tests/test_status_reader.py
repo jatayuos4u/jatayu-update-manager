@@ -116,3 +116,37 @@ class StatusReaderTests(unittest.TestCase):
         record = {'state': 'running', 'boot_id': 'a' * 36}
         self.assertEqual(s.reconcile_status(identifier, record,
                          unit_state='active', current_boot='a' * 36), 'running_confirmed')
+
+    def test_collected_transient_unit_is_inactive_only_when_explicit(self):
+        from unittest.mock import Mock
+        identifier = 'a' * 32
+        output = b'LoadState=not-found\nActiveState=inactive\nExecStart=\n'
+        for returncode in (0, 1):
+            with self.subTest(returncode=returncode):
+                runner = Mock(return_value=Mock(returncode=returncode, stdout=output))
+                self.assertEqual(s.check_worker_unit(identifier, runner), 'inactive')
+
+    def test_systemctl_failure_cannot_be_treated_as_collected_unit(self):
+        from unittest.mock import Mock
+        identifier = 'a' * 32
+        outputs = (
+            (1, b''),
+            (2, b'LoadState=not-found\nActiveState=inactive\nExecStart=\n'),
+            (1, b'LoadState=not-found\nActiveState=active\nExecStart=\n'),
+            (1, b'LoadState=not-found\nActiveState=inactive\nExecStart=unknown\n'),
+            (1, b'LoadState=not-found\nActiveState=inactive\nExecStart=\nExtra=foo\n'),
+        )
+        for code, output in outputs:
+            with self.subTest(code=code, output=output):
+                runner = Mock(return_value=Mock(returncode=code, stdout=output))
+                self.assertEqual(s.check_worker_unit(identifier, runner), 'unknown')
+
+    def test_active_unit_requires_actual_worker_executable_argv(self):
+        from unittest.mock import Mock
+        from jatayu_update_manager.supervisor import WORKER
+        identifier = 'a' * 32
+        fake = ('LoadState=loaded\nActiveState=active\n'
+                'ExecStart={ path=/bin/false ; argv[]=/bin/false '
+                + WORKER + ' ' + identifier + ' refresh - ; }\n').encode()
+        runner = Mock(return_value=Mock(returncode=0, stdout=fake))
+        self.assertEqual(s.check_worker_unit(identifier, runner), 'unknown')

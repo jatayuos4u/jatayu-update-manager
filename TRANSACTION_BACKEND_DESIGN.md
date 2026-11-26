@@ -93,3 +93,7 @@ The VM adapter now rejects symbolic-link paths **before resolution**, validates 
 ## Stage A19 — fail-closed production state parent verification
 
 Before creating the fixed production transaction-status directory, the supervisor now uses `lstat` to validate the ancestor directories as genuine root-owned directories without group/world write permission; a symlinked or untrusted parent blocks the privileged worker. Isolated test directories use the existing test-only policy. Tests cover symlinked components, writable parents, and rejection before creating state. This significantly reduces the opportunity for an unprivileged user to redirect root-owned journal writes, but per-component checks are not atomic openat2 resolution; real VM integration and a remaining privileged-state review still block release.
+
+## Stage A20 — collected transient-unit status
+
+A `systemd-run --collect` unit can disappear after its worker exits. The status reader now accepts a `not-found` unit as inactive only when `systemctl show` explicitly reports `LoadState=not-found`, `ActiveState=inactive`, and a blank `ExecStart` (with exit status 0 or 1). An empty, malformed or otherwise failed query stays unknown, preventing premature handoff replacement. Active-unit checks also require the expected configured worker executable and argv prefix. Mocked tests cover both safe collected-unit reporting and ambiguous failures. **A real systemd/Polkit run is still required to validate exact output across the target Debian 13 systemd build; stable release remains blocked.**
