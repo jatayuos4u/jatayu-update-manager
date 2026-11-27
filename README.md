@@ -1,20 +1,22 @@
 # Jatayu Update Manager
 
-[![Release](https://img.shields.io/badge/release-v1.2.2--rc2-orange)](https://github.com/jatayuos4u/jatayu-update-manager/releases/tag/v1.2.2-rc2)
+[![Candidate](https://img.shields.io/badge/testing-1.2.2--rc3-orange)](https://github.com/jatayuos4u/jatayu-update-manager/actions/runs/45934689197)
 [![Debian](https://img.shields.io/badge/Debian-13%20Trixie-blue)](https://www.debian.org/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-**Jatayu Update Manager 1.2.2** is a PyQt6 graphical APT update manager for [JatayuOS](https://jatayuos.in), based on Debian 13 Trixie and KDE Plasma.
+**Jatayu Update Manager 1.2.2 RC3 (testing candidate)** is a PyQt6 graphical APT update manager for [JatayuOS](https://jatayuos.in), based on Debian 13 Trixie and KDE Plasma.
 
 > [!WARNING]
-> **Pre-release / Testing (v1.2.2-rc2):** Not yet approved for production systems or inclusion in the stable JatayuOS ISO. The app still requires independent transaction supervision and concurrent APT/dpkg integration tests; see SECURITY_AUDIT_2026-11-25.md. Try it on a disposable VM or backed-up test system.
+> **Pre-release / Testing (v1.2.2-rc3 candidate):** Not yet approved for production systems or inclusion in the stable JatayuOS ISO. The app still requires independent transaction supervision and concurrent APT/dpkg integration tests; see SECURITY_AUDIT_2026-11-25.md. Try it on a disposable VM or backed-up test system.
 
 ## Download Jatayu Update Manager
 
-**[⬇ Download Jatayu Update Manager 1.2.2 RC2 (.deb)](https://github.com/jatayuos4u/jatayu-update-manager/releases/download/v1.2.2-rc2/jatayu-update-manager_1.2.2.rc2-1_all.deb)**
+**[⬇ Download RC3 candidate (.deb in GitHub Actions artifact)](https://github.com/jatayuos4u/jatayu-update-manager/actions/runs/45934689197)** — expand *Artifacts*, download `jatayu-update-manager-1.2.2-rc3-kernel-fix-test` and extract the ZIP. This is a temporary test artifact, **not** an official GitHub Release asset.
 
-- [View the official GitHub release and notes](https://github.com/jatayuos4u/jatayu-update-manager/releases/tag/v1.2.2-rc2)
-- [Download SHA-256 checksums](https://github.com/jatayuos4u/jatayu-update-manager/releases/download/v1.2.2-rc2/SHA256SUMS)
+Previous published testing build: [RC2 release](https://github.com/jatayuos4u/jatayu-update-manager/releases/tag/v1.2.2-rc2).
+
+- [Read RC3 candidate release notes](RELEASE_NOTES_v1.2.2-rc3.md)
+- The RC3 artifact contains `SHA256SUMS` beside its `.deb` file.
 - [See all releases](https://github.com/jatayuos4u/jatayu-update-manager/releases)
 
 ### Install the downloaded package
@@ -22,7 +24,7 @@
 Open Konsole in the folder containing the downloaded `.deb` file, then run:
 
 ```bash
-sudo apt install ./jatayu-update-manager_1.2.2.rc2-1_all.deb
+sudo apt install ./jatayu-update-manager_1.2.2~rc3-1_all.deb
 jatayu-update-manager
 ```
 
@@ -30,7 +32,11 @@ To verify the downloaded file, place `SHA256SUMS` alongside the `.deb` and run `
 
 ## Final security review
 
-See [25 November 2026 security audit](SECURITY_AUDIT_2026-11-25.md). **RC2 is still a pre-release**: crash-safe transaction supervision and concurrent package-manager tests are release blockers. Do not ship as stable or bundle in the public ISO yet.
+See [25 November 2026 security audit](SECURITY_AUDIT_2026-11-25.md). **RC3 remains a pre-release candidate**: crash-safe transaction supervision and concurrent package-manager tests are release blockers. Do not ship as stable or bundle in the public ISO yet.
+
+## RC3 functional verification
+
+On 27 November 2026, a JatayuOS Debian 13 laptop was observed detecting both the new Linux 6.12.118 image and its metapackage upgrade, showing them in the confirmation preview, installing them successfully, generating initramfs and GRUB entries, and booting the new kernel. Post-install `dpkg --audit` reported no problems and `apt-get check` succeeded. These results confirm the specific missing-kernel-update fix, **not** GUI-crash safety or a complete independent security audit.
 
 ## Features
 
@@ -56,7 +62,7 @@ sudo apt install --no-install-recommends build-essential debhelper dh-python dpk
 dpkg-buildpackage -us -uc -b
 ```
 
-The package is written to the parent directory, e.g. `../jatayu-update-manager_1.2.2.rc2-1_all.deb`.
+The package is written to the parent directory, e.g. `../jatayu-update-manager_1.2.2~rc3-1_all.deb`.
 
 ## Test and run from source
 
@@ -69,7 +75,7 @@ python3 -m compileall -q src helper scripts
 
 ## Scope and limitations
 
-- Refresh executes `apt-get update`, and install uses `apt-get -y --no-remove upgrade` via a fixed Polkit helper.
+- Refresh executes `apt-get update`, and install uses `apt-get -y --with-new-pkgs --no-remove upgrade` via a fixed Polkit helper. The same removal-free plan is used for discovery and preview.
 - This is **not** a full distribution upgrade, Flatpak manager, or security-update classifier.
 - APT may hold back packages. Package listings rely on APT metadata.
 - The displayed progress bar is indeterminate; detailed operation output is available in the log.

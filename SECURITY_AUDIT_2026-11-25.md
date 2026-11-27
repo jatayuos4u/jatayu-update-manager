@@ -44,3 +44,9 @@ RC2 may be published as a **testing pre-release**, but it must not be described 
 8. Review the release's package SHA256, provenance, and GitHub protection settings.
 
 This is a static/code-workflow audit, not a complete penetration test or certification.
+
+## RC3 kernel-detection follow-up (27 November 2026)
+
+The user identified that Discover offered a new `linux-image-6.12.118+deb13-amd64` dependency and the `linux-image-amd64` metapackage while RC2 reported no updates. RC3 changes discovery, preview, and privileged execution to the same `apt-get upgrade --with-new-pkgs --no-remove` policy. The proposed kernel upgrade was verified by a successful local simulation and subsequently a real installation, clean `dpkg --audit` and `apt-get check`, successful reboot into `6.12.118+deb13-amd64`, and an empty post-upgrade list. CI for the focused fix completed successfully: 27 tests passed, one skipped, Debian 13 package built.
+
+**Security decision unchanged:** SEC-01, SEC-02 and SEC-07 remain open. The earlier RC2 audit is not a certification of RC3; this is a focused follow-up only. Do not describe RC3 as stable or include it by default in the public ISO until disposable-VM crash and transaction-interruption testing passes. Release provenance, signed checksums and branch protections remain unresolved independently of the successful kernel upgrade.
