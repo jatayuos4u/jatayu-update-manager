@@ -1,38 +1,40 @@
 # Jatayu Update Manager
 
-[![Candidate](https://img.shields.io/badge/testing-1.2.2--rc3-orange)](https://github.com/jatayuos4u/jatayu-update-manager/actions/runs/45934689197)
+[![Pre-release](https://img.shields.io/badge/pre--release-v1.2.2--rc3-orange)](https://github.com/jatayuos4u/jatayu-update-manager/releases/tag/v1.2.2-rc3)
 [![Debian](https://img.shields.io/badge/Debian-13%20Trixie-blue)](https://www.debian.org/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-**Jatayu Update Manager 1.2.2 RC3 (testing candidate)** is a PyQt6 graphical APT update manager for [JatayuOS](https://jatayuos.in), based on Debian 13 Trixie and KDE Plasma.
+**Jatayu Update Manager 1.2.2 RC3 (published testing pre-release)** is a PyQt6 graphical APT update manager for [JatayuOS](https://jatayuos.in), based on Debian 13 Trixie and KDE Plasma.
 
 > [!WARNING]
-> **Pre-release / Testing (v1.2.2-rc3 candidate):** Not yet approved for production systems or inclusion in the stable JatayuOS ISO. The app still requires independent transaction supervision and concurrent APT/dpkg integration tests; see SECURITY_AUDIT_2026-11-25.md. Try it on a disposable VM or backed-up test system.
+> **Pre-release / Testing (v1.2.2-rc3):** Not yet approved for production systems or inclusion in the stable JatayuOS ISO. The app still requires independent transaction supervision and concurrent APT/dpkg integration tests; see SECURITY_AUDIT_2026-11-25.md. Try it on a disposable VM or backed-up test system.
 
 ## Download Jatayu Update Manager
 
-**[⬇ Download RC3 candidate (.deb in GitHub Actions artifact)](https://github.com/jatayuos4u/jatayu-update-manager/actions/runs/45934689197)** — expand *Artifacts*, download `jatayu-update-manager-1.2.2-rc3-kernel-fix-test` and extract the ZIP. This is a temporary test artifact, **not** an official GitHub Release asset.
+**[⬇ Download Jatayu Update Manager 1.2.2 RC3 (.deb)](https://github.com/jatayuos4u/jatayu-update-manager/releases/download/v1.2.2-rc3/jatayu-update-manager_1.2.2.rc3-1_all.deb)**
 
-Previous published testing build: [RC2 release](https://github.com/jatayuos4u/jatayu-update-manager/releases/tag/v1.2.2-rc2).
+- [Official RC3 testing pre-release and release notes](https://github.com/jatayuos4u/jatayu-update-manager/releases/tag/v1.2.2-rc3)
+- [Download the published SHA-256 checksums](https://github.com/jatayuos4u/jatayu-update-manager/releases/download/v1.2.2-rc3/SHA256SUMS)
+- [All releases](https://github.com/jatayuos4u/jatayu-update-manager/releases)
 
-- [Read RC3 candidate release notes](RELEASE_NOTES_v1.2.2-rc3.md)
-- The RC3 artifact contains `SHA256SUMS` beside its `.deb` file.
-- [See all releases](https://github.com/jatayuos4u/jatayu-update-manager/releases)
+**Filename note:** GitHub release asset upload normalized Debian's `~` in the published filename to `.`. The Debian package **internally** retains version `1.2.2~rc3-1`; the downloadable asset is named `jatayu-update-manager_1.2.2.rc3-1_all.deb`. The published `SHA256SUMS` uses the original filename with `~`. Rename the downloaded asset to the original package filename *before* running `sha256sum -c SHA256SUMS`. The checksum should match because only the filename changes, not the bytes.
 
 ### Install the downloaded package
 
 Open Konsole in the folder containing the downloaded `.deb` file, then run:
 
 ```bash
-sudo apt install ./jatayu-update-manager_1.2.2~rc3-1_all.deb
+mv jatayu-update-manager_1.2.2.rc3-1_all.deb 'jatayu-update-manager_1.2.2~rc3-1_all.deb'
+sha256sum -c SHA256SUMS
+sudo apt install './jatayu-update-manager_1.2.2~rc3-1_all.deb'
 jatayu-update-manager
 ```
 
-To verify the downloaded file, place `SHA256SUMS` alongside the `.deb` and run `sha256sum -c SHA256SUMS` before installation.
+Download `SHA256SUMS` to the same directory as the `.deb` file before running the commands. Do not install if the checksum check fails.
 
 ## Final security review
 
-See [25 November 2026 security audit](SECURITY_AUDIT_2026-11-25.md). **RC3 remains a pre-release candidate**: crash-safe transaction supervision and concurrent package-manager tests are release blockers. Do not ship as stable or bundle in the public ISO yet.
+See [25 November 2026 security audit](SECURITY_AUDIT_2026-11-25.md). **RC3 remains a testing pre-release**: crash-safe transaction supervision and concurrent package-manager tests are release blockers. Do not ship as stable or bundle in the public ISO yet.
 
 ## RC3 functional verification
 
