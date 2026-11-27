@@ -12,7 +12,7 @@ ENV = {'PATH': '/usr/sbin:/usr/bin:/sbin:/bin',
        'DEBIAN_FRONTEND': 'noninteractive', 'HOME': '/root'}
 
 def preview():
-    command = [APT, '-s', '--no-remove', 'upgrade']
+    command = [APT, '-s', '--with-new-pkgs', '--no-remove', 'upgrade']
     result = subprocess.run(command, env=ENV, cwd='/', check=False,
                             capture_output=True, text=True, timeout=120)
     if result.returncode:
@@ -35,7 +35,7 @@ def main(argv=None):
         if current.digest != args[1]:
             print('APT upgrade plan changed since confirmation. Refresh and review again.', file=sys.stderr)
             return 4
-        command = [APT, '-y', '--no-remove', 'upgrade',
+        command = [APT, '-y', '--with-new-pkgs', '--no-remove', 'upgrade',
                    '-o', 'Dpkg::Use-Pty=0',
                    '-o', 'Dpkg::Options::=--force-confold']
     else:
