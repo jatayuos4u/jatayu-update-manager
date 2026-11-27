@@ -53,6 +53,7 @@ class PrivilegeTests(unittest.TestCase):
     def test_changed_plan_rejected_without_running_upgrade(self):
         helper = load_helper()
         with patch.object(helper.os, 'geteuid', return_value=0), \
+             patch.object(helper, 'frontend_available', return_value=True), \
              patch.object(helper, 'preview', return_value=parse_simulation('Inst a [1] (2)\n')), \
              patch.object(helper.subprocess, 'run') as runner:
             self.assertEqual(helper.main(['upgrade', '0'*64]), 4)
@@ -62,12 +63,14 @@ class PrivilegeTests(unittest.TestCase):
         helper = load_helper()
         preview = parse_simulation('Inst a [1] (2)\n')
         with patch.object(helper.os, 'geteuid', return_value=0), \
+             patch.object(helper, 'frontend_available', return_value=True), \
              patch.object(helper, 'preview', return_value=preview), \
              patch.object(helper.subprocess, 'run', return_value=Mock(returncode=0)) as runner:
             self.assertEqual(helper.main(['upgrade', preview.digest]), 0)
             cmd = runner.call_args.args[0]
             self.assertEqual(cmd[0], '/usr/bin/apt-get')
             self.assertIn('--no-remove', cmd)
+            self.assertIn('--with-new-pkgs', cmd)
             self.assertEqual(runner.call_args.kwargs.get('cwd'), '/')
             self.assertEqual(runner.call_args.kwargs.get('env'), helper.ENV)
 
@@ -78,6 +81,7 @@ class PrivilegeTests(unittest.TestCase):
     def test_refresh_fails_on_partial_repository_fetch(self):
         helper = load_helper()
         with patch.object(helper.os, 'geteuid', return_value=0), \
+             patch.object(helper, 'frontend_available', return_value=True), \
              patch.object(helper.subprocess, 'run', return_value=Mock(returncode=0)) as runner:
             self.assertEqual(helper.main(['refresh']), 0)
             cmd = runner.call_args.args[0]
@@ -137,3 +141,15 @@ class PrivilegeTests(unittest.TestCase):
                 owner.stdout.close()
                 owner.stderr.close()
             self.assertTrue(helper.frontend_available(lock_path))
+
+    def test_privileged_preview_allows_new_dependencies_without_removal(self):
+        helper = load_helper()
+        plan = 'Inst linux-image-amd64 [1] (2 Debian)\nConf linux-image-amd64 (2 Debian)\n'
+        with patch.object(helper.subprocess, 'run',
+                          return_value=Mock(returncode=0, stdout=plan, stderr='')) as runner:
+            result = helper.preview()
+            self.assertEqual(len(result.installs), 1)
+            args = runner.call_args.args[0]
+            self.assertIn('--with-new-pkgs', args)
+            self.assertIn('--no-remove', args)
+            self.assertNotIn('dist-upgrade', args)

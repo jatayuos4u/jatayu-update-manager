@@ -33,7 +33,7 @@ def frontend_available(lock_path=FRONTEND_LOCK):
     return True
 
 def preview():
-    command = [APT, '-s', '--no-remove', 'upgrade']
+    command = [APT, '-s', '--with-new-pkgs', '--no-remove', 'upgrade']
     result = subprocess.run(command, env=ENV, cwd='/', check=False,
                             capture_output=True, text=True, timeout=120)
     if result.returncode:
@@ -67,7 +67,7 @@ def main(argv=None):
         if not frontend_available():
             print('Package manager became busy. Retry after it finishes.', file=sys.stderr)
             return BUSY_EXIT
-        command = [APT, '-y', '--no-remove', 'upgrade',
+        command = [APT, '-y', '--with-new-pkgs', '--no-remove', 'upgrade',
                    '-o', 'Dpkg::Use-Pty=0',
                    '-o', 'Dpkg::Options::=--force-confold']
     else:

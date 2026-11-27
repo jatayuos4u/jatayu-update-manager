@@ -670,7 +670,7 @@ class MainWindow(QMainWindow):
         self.process.readyReadStandardOutput.connect(self.read_output)
         self.process.errorOccurred.connect(self.process_error)
         self.process.finished.connect(self.preview_finished)
-        self.process.start('/usr/bin/apt-get', ['-s', '--no-remove', 'upgrade'])
+        self.process.start('/usr/bin/apt-get', ['-s', '--with-new-pkgs', '--no-remove', 'upgrade'])
 
     def preview_finished(self, code, status):
         if self.operation != 'preview':

@@ -1,3 +1,10 @@
+jatayu-update-manager (1.2.3~alpha23-1) unstable; urgency=medium
+
+  * Integrate the RC3 safe kernel upgrade policy with transaction lock checks.
+  * Preserve the supervised backend as an experimental test path.
+
+ -- JatayuOS Team <maintainers@jatayuos.in>  Fri, 27 Nov 2026 10:30:00 +0530
+
 jatayu-update-manager (1.2.3~alpha22-1) unstable; urgency=medium
 
   * Block supervised transactions globally when an earlier worker left unresolved state.
@@ -209,6 +216,16 @@ jatayu-update-manager (1.2.3~alpha1-1) unstable; urgency=medium
   * Begin the transaction backend redesign; no stable/crash-safe claims.
 
  -- JatayuOS Team <maintainers@jatayuos.in>  Thu, 26 Nov 2026 19:45:00 +0530
+
+jatayu-update-manager (1.2.2~rc3-1) unstable; urgency=medium
+
+  * Detect safe upgrades including newly required kernel images.
+  * Align update discovery, preview, and installation with --with-new-pkgs.
+  * Keep --no-remove; never silently escalate to full-upgrade.
+  * Improve accurate empty-state messages in English and Hindi.
+  * Add regression tests for kernel updates and removal protection.
+
+ -- JatayuOS Team <maintainers@jatayuos.in>  Fri, 27 Nov 2026 09:00:00 +0530
 
 jatayu-update-manager (1.2.2~rc2-1) unstable; urgency=medium
 
