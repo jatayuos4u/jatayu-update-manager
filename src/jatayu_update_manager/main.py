@@ -1,9 +1,13 @@
 """Jatayu Update Manager: native Qt dashboard for Debian APT."""
+import os
 import sys
 from pathlib import Path
-from PyQt6.QtCore import Qt, QProcess, QSettings, QSize, QUrl
+from PyQt6.QtCore import Qt, QProcess, QSettings, QSize, QUrl, QTimer
 from PyQt6.QtGui import QIcon, QAction, QDesktopServices
 from .transaction import parse_simulation, SimulationError
+from .status_reader import read_status, reconcile_status, InvalidStatus
+from .supervised_protocol import parse_launcher_reply, parse_recovery_reply, MAX_LAUNCH_OUTPUT
+# Recovery handoffs are deliberately root-only pending an authorized IPC API.
 from PyQt6.QtWidgets import (QApplication, QComboBox, QFrame, QHBoxLayout, QLabel,
     QMainWindow, QMessageBox, QPushButton, QProgressBar, QTabWidget, QTableWidget,
     QTableWidgetItem, QTextEdit, QVBoxLayout, QWidget, QHeaderView, QAbstractItemView, QStackedWidget, QLineEdit, QStyle, QSizePolicy, QToolButton, QMenu, QDialog, QDialogButtonBox, QFormLayout)
@@ -12,6 +16,10 @@ from .i18n import tr
 from . import __version__
 
 HELPER = '/usr/lib/jatayu-update-manager/privileged-helper'
+SUPERVISED_LAUNCHER = '/usr/lib/jatayu-update-manager/supervised-launcher'
+RECOVERY_LOOKUP = '/usr/lib/jatayu-update-manager/recovery-lookup'
+# Developer opt-in only; the published default update buttons are unchanged.
+EXPERIMENTAL_SUPERVISED = os.environ.get('JATAYU_UPDATE_MANAGER_EXPERIMENTAL') == '1'
 APP_ICON_PATH = Path('/usr/share/icons/hicolor/scalable/apps/jatayu-update-manager.svg')
 DESKTOP_FILE_ID = 'in.jatayuos.update-manager'
 
@@ -29,8 +37,21 @@ class MainWindow(QMainWindow):
         self.preview_output = bytearray()
         self.preview_too_large = False
         self.list_expanded = False
+        self.supervised_process = None
+        self.recovery_process = None
+        self.recovery_response = bytearray()
+        self.recovery_too_large = False
+        self.supervised_response = bytearray()
+        self.supervised_too_large = False
+        self.supervised_timer = QTimer(self)
+        self.supervised_timer.setInterval(2000)
+        self.supervised_timer.timeout.connect(self.poll_supervised_status)
         self.build_ui()
         self.load_updates()
+        # Recovery requires explicit administrator authentication; never run at startup.
+        if self.settings.value('supervised_transaction_id', ''):
+            self.supervised_timer.start()
+            self.poll_supervised_status()
 
     def t(self, key, **kwargs):
         return tr(self.lang, key, **kwargs)
@@ -106,12 +127,21 @@ class MainWindow(QMainWindow):
         self.help_action = QAction(self)
         self.issue_action = QAction(self)
         self.license_action = QAction(self)
+        self.transaction_status_action = QAction(self)
+        self.transaction_status_action.triggered.connect(self.show_transaction_status)
+        self.supervised_start_action = QAction(self)
+        self.supervised_start_action.triggered.connect(self.start_supervised_refresh)
+        self.recovery_action = QAction(self)
+        self.recovery_action.triggered.connect(self.recover_supervised_handoff)
         self.about_action.triggered.connect(self.show_about)
         self.help_action.triggered.connect(self.show_help)
         self.issue_action.triggered.connect(self.open_issues)
         self.license_action.triggered.connect(self.show_license)
-        for action in (self.about_action, self.help_action, self.issue_action, self.license_action):
+        for action in (self.about_action, self.help_action, self.issue_action, self.license_action, self.transaction_status_action):
             self.app_menu.addAction(action)
+        if EXPERIMENTAL_SUPERVISED:
+            self.app_menu.addAction(self.supervised_start_action)
+            self.app_menu.addAction(self.recovery_action)
         header.addWidget(self.menu_button)
         outer.addLayout(header)
 
@@ -310,8 +340,11 @@ class MainWindow(QMainWindow):
         self.menu_button.setToolTip(self.t('menu'))
         self.menu_button.setAccessibleName(self.t('menu'))
         for action, key in ((self.about_action, 'about'), (self.help_action, 'help'),
-                            (self.issue_action, 'report_issue'), (self.license_action, 'license_credits')):
+                            (self.issue_action, 'report_issue'), (self.license_action, 'license_credits'),
+                            (self.transaction_status_action, 'transaction_status')):
             action.setText(self.t(key))
+        self.supervised_start_action.setText(self.t('supervised_start'))
+        self.recovery_action.setText(self.t('recover_previous_transaction'))
         self.title_label.setText(self.t('title'))
         self.subtitle_label.setText(self.t('subtitle'))
         self.hero_title.setText(self.t('system_status'))
@@ -371,6 +404,173 @@ class MainWindow(QMainWindow):
         buttons.rejected.connect(dialog.reject)
         layout.addWidget(buttons)
         return dialog
+
+    def recover_supervised_handoff(self):
+        """Developer-only, explicit, Polkit-authorized recovery of own handoff.
+
+        Never read a root-owned file directly or start packages here.
+        """
+        if not EXPERIMENTAL_SUPERVISED or self.recovery_process is not None:
+            return
+        if self.supervised_process is not None or self.busy:
+            return
+        if self.settings.value('supervised_transaction_id', ''):
+            QMessageBox.information(self, self.t('transaction_status'),
+                                    self.supervised_status_text())
+            return
+        if QMessageBox.question(
+                self, self.t('recover_previous_transaction'),
+                self.t('recovery_auth_warning'),
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No) != QMessageBox.StandardButton.Yes:
+            return
+        self.recovery_response.clear()
+        self.recovery_too_large = False
+        process = QProcess(self)
+        self.recovery_process = process
+        process.setProcessChannelMode(QProcess.ProcessChannelMode.MergedChannels)
+        process.readyReadStandardOutput.connect(self.read_recovery_reply)
+        process.finished.connect(self.recovery_finished)
+        process.errorOccurred.connect(self.recovery_error)
+        process.start('/usr/bin/pkexec', [RECOVERY_LOOKUP])
+
+    def read_recovery_reply(self):
+        if self.recovery_process is None:
+            return
+        block = bytes(self.recovery_process.readAllStandardOutput())
+        if len(self.recovery_response) + len(block) > MAX_LAUNCH_OUTPUT:
+            self.recovery_too_large = True
+            self.recovery_response.clear()
+            return
+        if not self.recovery_too_large:
+            self.recovery_response.extend(block)
+
+    def recovery_error(self, error):
+        if error == QProcess.ProcessError.FailedToStart:
+            self.recovery_process = None
+            self.recovery_response.clear()
+            QMessageBox.warning(self, self.t('error'), self.t('recovery_failed'))
+
+    def recovery_finished(self, code, status):
+        if self.recovery_process is None:
+            return
+        self.read_recovery_reply()
+        self.recovery_process = None
+        try:
+            if self.recovery_too_large or status != QProcess.ExitStatus.NormalExit:
+                raise ValueError('Untrusted recovery response')
+            identifier = parse_recovery_reply(self.recovery_response, code)
+        except ValueError:
+            QMessageBox.warning(self, self.t('error'), self.t('recovery_failed'))
+            return
+        self.settings.setValue('supervised_transaction_id', identifier)
+        self.settings.sync()
+        self.supervised_timer.start()
+        self.poll_supervised_status()
+        QMessageBox.information(self, self.t('transaction_status'),
+                                self.supervised_status_text())
+
+    def start_supervised_refresh(self):
+        """Opt-in developer-only refresh; not connected to normal update controls."""
+        if not EXPERIMENTAL_SUPERVISED or self.busy or self.supervised_process is not None:
+            return
+        if self.settings.value('supervised_transaction_id', ''):
+            QMessageBox.warning(self, self.t('error'), self.t('supervised_previous'))
+            return
+        if QMessageBox.question(self, self.t('supervised_start'),
+                self.t('supervised_confirm'),
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No) != QMessageBox.StandardButton.Yes:
+            return
+        self.supervised_response.clear()
+        self.supervised_too_large = False
+        process = QProcess(self)
+        self.supervised_process = process
+        process.setProcessChannelMode(QProcess.ProcessChannelMode.MergedChannels)
+        process.readyReadStandardOutput.connect(self.read_supervised_launch_reply)
+        process.finished.connect(self.supervised_launch_finished)
+        process.errorOccurred.connect(self.supervised_launch_error)
+        process.start('/usr/bin/pkexec', [SUPERVISED_LAUNCHER, 'refresh'])
+
+    def read_supervised_launch_reply(self):
+        if self.supervised_process is None:
+            return
+        data = bytes(self.supervised_process.readAllStandardOutput())
+        if len(self.supervised_response) + len(data) > MAX_LAUNCH_OUTPUT:
+            self.supervised_too_large = True
+            self.supervised_response.clear()
+            # The launcher is only a short-lived authorization process,
+            # not the privileged APT worker. Never kill the systemd service.
+            return
+        if not self.supervised_too_large:
+            self.supervised_response.extend(data)
+
+    def supervised_launch_error(self, error):
+        if error == QProcess.ProcessError.FailedToStart:
+            self.supervised_process = None
+            self.supervised_response.clear()
+            QMessageBox.warning(self, self.t('error'), self.t('supervised_launch_failed'))
+
+    def supervised_launch_finished(self, code, status):
+        if self.supervised_process is None:
+            return
+        self.read_supervised_launch_reply()
+        self.supervised_process = None
+        try:
+            if self.supervised_too_large or status != QProcess.ExitStatus.NormalExit:
+                raise ValueError('Invalid launch output')
+            identifier = parse_launcher_reply(self.supervised_response, code)
+        except ValueError:
+            QMessageBox.warning(self, self.t('error'), self.t('supervised_launch_failed'))
+            return
+        self.settings.setValue('supervised_transaction_id', identifier)
+        self.settings.sync()
+        self.supervised_timer.start()
+        self.poll_supervised_status()
+
+    def poll_supervised_status(self):
+        identifier = self.settings.value('supervised_transaction_id', '')
+        if not identifier:
+            self.supervised_timer.stop()
+            return
+        try:
+            state = reconcile_status(str(identifier), read_status(str(identifier)))
+        except (OSError, ValueError):
+            # Status may not exist immediately after systemd-run returned.
+            # Do not report completion or clear the ID on a missing record.
+            return
+        if state in ('completed', 'failed', 'interrupted_unknown'):
+            self.supervised_timer.stop()
+        # This prototype exposes status via the menu, not the normal APT
+        # progress indicator, to avoid misleading progress/success claims.
+
+    def supervised_status_text(self):
+        """Read-only diagnostic; never interpret a status record as package health.
+
+        Alpha 6 does not start supervised transactions. An ID may be saved by
+        an authorized future flow, but the status is always revalidated.
+        """
+        identifier = self.settings.value('supervised_transaction_id', '')
+        if not identifier:
+            return self.t('transaction_not_tracked')
+        try:
+            record = read_status(str(identifier))
+            state = reconcile_status(str(identifier), record)
+        except (OSError, ValueError, InvalidStatus):
+            return self.t('transaction_unavailable')
+        if state == 'completed':
+            return self.t('transaction_completed_unverified')
+        if state == 'failed':
+            return self.t('transaction_failed', code=record['exit_code'])
+        if state == 'interrupted_unknown':
+            return self.t('transaction_interrupted')
+        if state == 'running_confirmed':
+            return self.t('transaction_running_confirmed')
+        return self.t('transaction_running_unverified')
+
+    def show_transaction_status(self):
+        QMessageBox.information(self, self.t('transaction_status'),
+                                self.supervised_status_text())
 
     def show_about(self):
         self.build_about_dialog().exec()

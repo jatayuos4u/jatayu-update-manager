@@ -1,3 +1,222 @@
+jatayu-update-manager (1.2.3~alpha23-1) unstable; urgency=medium
+
+  * Integrate the RC3 safe kernel upgrade policy with transaction lock checks.
+  * Preserve the supervised backend as an experimental test path.
+
+ -- JatayuOS Team <maintainers@jatayuos.in>  Fri, 27 Nov 2026 10:30:00 +0530
+
+jatayu-update-manager (1.2.3~alpha22-1) unstable; urgency=medium
+
+  * Block supervised transactions globally when an earlier worker left unresolved state.
+  * Enforce status-journal inspection while holding the worker's transaction lock.
+  * Refuse malformed, symlinked and excessive transaction journals before APT starts.
+  * Add cross-transaction regression coverage without executing real APT.
+  * Preserve existing RC2 update controls and developer-only supervised mode.
+
+ -- JatayuOS Team <maintainers@jatayuos.in>  Thu, 26 Nov 2026 23:45:00 +0530
+
+jatayu-update-manager (1.2.3~alpha21-1) unstable; urgency=medium
+
+  * Set explicit systemd control-group lifecycle for supervised APT workers.
+  * Configure systemd to terminate worker descendants when its unit stops.
+  * Keep stdin disconnected and test for orphan-prone KillMode regressions.
+  * Retain experimental feature gate and the verified RC2 update path.
+
+ -- JatayuOS Team <maintainers@jatayuos.in>  Thu, 26 Nov 2026 23:30:00 +0530
+
+jatayu-update-manager (1.2.3~alpha20-1) unstable; urgency=medium
+
+  * Handle collected transient systemd units after worker completion.
+  * Recognize missing units only with explicit inactive and empty ExecStart fields.
+  * Keep ambiguous systemctl errors fail-closed; reject misleading argv matches.
+  * Add unit-state and recovery regression coverage, keeping RC2 update path intact.
+
+ -- JatayuOS Team <maintainers@jatayuos.in>  Thu, 26 Nov 2026 23:00:00 +0530
+
+jatayu-update-manager (1.2.3~alpha19-1) unstable; urgency=medium
+
+  * Fail closed if the production state directory's parent path is untrusted.
+  * Reject symlinked, non-root-owned or group/world-writable parent components.
+  * Validate parent chain before creating transaction state directories.
+  * Add mocked and isolated tests; do not alter normal update controls.
+  * Preserve VM-only service integration release gate.
+
+ -- JatayuOS Team <maintainers@jatayuos.in>  Thu, 26 Nov 2026 22:30:00 +0530
+
+jatayu-update-manager (1.2.3~alpha18-1) unstable; urgency=medium
+
+  * Reject mock-helper symlinks before resolving VM test paths.
+  * Require root-owned, private, executable mock-helper and directory.
+  * Add regression tests for symlink and unsafe-directory rejection.
+  * Retain mock-only VM integration and normal RC2-backed update controls.
+
+ -- JatayuOS Team <maintainers@jatayuos.in>  Fri, 27 Nov 2026 00:10:00 +0530
+
+jatayu-update-manager (1.2.3~alpha17-1) unstable; urgency=medium
+
+  * Add disposable-VM integration harness for actual supervised worker code.
+  * Run real worker status/locking logic under systemd with an isolated fake helper.
+  * Exercise successful and failed mock actions after launcher process termination.
+  * Require explicit root, Debian 13 VM and operator acknowledgement to execute.
+  * Keep APT/dpkg untouched and normal update workflow unchanged.
+
+ -- JatayuOS Team <maintainers@jatayuos.in>  Thu, 26 Nov 2026 23:55:00 +0530
+
+jatayu-update-manager (1.2.3~alpha16-1) unstable; urgency=medium
+
+  * Add a guarded Debian 13 disposable-VM systemd smoke harness with a mock task.
+  * Verify the mock worker can survive its controller process termination.
+  * Require explicit acknowledgement, root and virtualization checks to run.
+  * Test harness safety gates in CI without executing a live systemd unit.
+  * Preserve normal update backend; no production crash-safety claims.
+
+ -- JatayuOS Team <maintainers@jatayuos.in>  Thu, 26 Nov 2026 23:45:00 +0530
+
+jatayu-update-manager (1.2.3~alpha15-1) unstable; urgency=medium
+
+  * Audit built Debian package contents, not source manifests alone.
+  * Verify all three privileged helper and Polkit policy paths match.
+  * Require explicit administrator authentication and deny inactive or remote sessions.
+  * Reject world-writable, setuid/setgid, or writable privileged archive entries.
+  * Keep experimental supervised service off by default and retain RC2 update path.
+
+ -- JatayuOS Team <maintainers@jatayuos.in>  Thu, 26 Nov 2026 23:20:00 +0530
+
+jatayu-update-manager (1.2.3~alpha14-1) unstable; urgency=medium
+
+  * Introduce explicit Polkit-authenticated read-only lost-ID recovery.
+  * Restrict lookup to pkexec caller UID without accepting path/UID arguments.
+  * Keep private 0600 handoff files and avoid startup authorization prompts.
+  * Verify bounded recovery reply and preserve normal APT workflow.
+  * Add bilingual developer-only action and regression tests.
+
+ -- JatayuOS Team <maintainers@jatayuos.in>  Thu, 26 Nov 2026 22:35:00 +0530
+
+jatayu-update-manager (1.2.3~alpha13-1) unstable; urgency=medium
+
+  * Restrict root-owned per-user handoff recovery records to mode 0600.
+  * Prevent direct unprivileged access to private handoff data.
+  * Make the production transaction directory non-listable by ordinary users.
+  * Disable unsafe automatic GUI handoff recovery pending authenticated IPC.
+  * Add regression tests for permissions and deliberately disabled recovery.
+
+ -- JatayuOS Team <maintainers@jatayuos.in>  Thu, 26 Nov 2026 22:15:00 +0530
+
+jatayu-update-manager (1.2.3~alpha12-1) unstable; urgency=medium
+
+  * Block handoff replacement until previous transaction has final state and inactive systemd unit.
+  * Fail closed when service liveness cannot be verified.
+  * Normalize signal-terminated helper return codes before persisting status.
+  * Validate consistency of running/completed/failed records at write time.
+  * Add recovery and abnormal termination tests without touching APT.
+
+ -- JatayuOS Team <maintainers@jatayuos.in>  Thu, 26 Nov 2026 21:55:00 +0530
+
+jatayu-update-manager (1.2.3~alpha11-1) unstable; urgency=medium
+
+  * Prevent reusing a per-user recovery pointer while a transaction is unresolved.
+  * Serialize competing launchers using a distinct advisory lock file.
+  * Refuse a second launch if prior status is missing, incomplete or invalid.
+  * Add negative regression tests for launch ordering and handoff safety.
+  * Preserve existing normal APT buttons and development-only service path.
+
+ -- JatayuOS Team <maintainers@jatayuos.in>  Thu, 26 Nov 2026 21:40:00 +0530
+
+jatayu-update-manager (1.2.3~alpha10-1) unstable; urgency=medium
+
+  * Persist root-owned per-user transaction locator before starting systemd-run.
+  * Mark unknown launcher outcomes without erasing recovery information.
+  * Allow developer-opt-in GUI to rediscover an authorized handoff after restart.
+  * Add isolation tests for account boundary, damaged files and launch ordering.
+  * Keep normal update buttons on the existing RC2 backend.
+
+ -- JatayuOS Team <maintainers@jatayuos.in>  Thu, 26 Nov 2026 21:15:00 +0530
+
+jatayu-update-manager (1.2.3~alpha9-1) unstable; urgency=medium
+
+  * Add subprocess fault injection for a detached worker and killed controller.
+  * Verify isolated worker status reaches completion without a living GUI controller.
+  * Verify unfinished records do not become success after an inactive worker.
+  * Never invoke real APT or systemd in these fault-injection tests.
+  * Retain developer-only supervised service option and RC2 default backend.
+
+ -- JatayuOS Team <maintainers@jatayuos.in>  Thu, 26 Nov 2026 23:30:00 +0530
+
+jatayu-update-manager (1.2.3~alpha8-1) unstable; urgency=medium
+
+  * Verify the active systemd unit against the expected root worker path.
+  * Distinguish active, inactive and unknown service queries conservatively.
+  * Never confuse an inactive worker or stale transaction record with success.
+  * Retain developer-only supervised refresh and existing normal APT backend.
+
+ -- JatayuOS Team <maintainers@jatayuos.in>  Thu, 26 Nov 2026 23:00:00 +0530
+
+jatayu-update-manager (1.2.3~alpha7-1) unstable; urgency=medium
+
+  * Prototype opt-in developer-only supervised refresh launcher handshake.
+  * Persist authorized transaction locator and poll read-only status after restart.
+  * Bound and validate launcher response; never treat service start as APT completion.
+  * Leave normal Check and Install operations on the existing verified RC2 path.
+  * Add bilingual opt-in warning and headless reconnection/protocol tests.
+
+ -- JatayuOS Team <maintainers@jatayuos.in>  Thu, 26 Nov 2026 22:30:00 +0530
+
+jatayu-update-manager (1.2.3~alpha6-1) unstable; urgency=medium
+
+  * Add read-only experimental transaction-status entry to the application menu.
+  * Report stale, interrupted, unavailable and completed worker records conservatively.
+  * Preserve the existing privileged APT update path; no experimental service start from GUI.
+  * Add English/Hindi diagnostics and headless GUI tests.
+
+ -- JatayuOS Team <maintainers@jatayuos.in>  Thu, 26 Nov 2026 22:00:00 +0530
+
+jatayu-update-manager (1.2.3~alpha5-1) unstable; urgency=medium
+
+  * Add separately Polkit-authorized fixed-argument supervised launcher.
+  * Refuse malformed requests and unauthenticated launcher execution.
+  * Sanitize environment for systemd-run invocation and test launch failures.
+  * Keep GUI on existing 1.2.2-compatible update path.
+
+ -- JatayuOS Team <maintainers@jatayuos.in>  Thu, 26 Nov 2026 21:30:00 +0530
+
+jatayu-update-manager (1.2.3~alpha4-1) unstable; urgency=medium
+
+  * Add read-only, bounded, no-symlink transaction status retrieval.
+  * Reject malformed or unsafe status files before presentation.
+  * Classify pre-reboot unfinished work as interrupted with unknown outcome.
+  * Avoid claiming success or active APT execution from stale running records.
+  * Keep privileged service launcher and GUI integration disabled pending review.
+
+ -- JatayuOS Team <maintainers@jatayuos.in>  Thu, 26 Nov 2026 21:00:00 +0530
+
+jatayu-update-manager (1.2.3~alpha3-1) unstable; urgency=medium
+
+  * Add cross-process single-flight lock held for entire supervised transaction.
+  * Refuse overlapping worker transactions without invoking APT.
+  * Include boot identity and update timestamp in atomic status records.
+  * Reject unsafe status-directory and lock-file permissions.
+  * Keep GUI on the existing verified transaction path.
+
+ -- JatayuOS Team <maintainers@jatayuos.in>  Thu, 26 Nov 2026 20:30:00 +0530
+
+jatayu-update-manager (1.2.3~alpha2-1) unstable; urgency=medium
+
+  * Prototype opt-in systemd-supervised root transaction worker.
+  * Atomically persist minimal root-owned transaction status records.
+  * Add backend unit tests without switching over the existing GUI.
+  * Do not claim stable crash recovery or atomic APT plan execution.
+
+ -- JatayuOS Team <maintainers@jatayuos.in>  Thu, 26 Nov 2026 20:00:00 +0530
+
+jatayu-update-manager (1.2.3~alpha1-1) unstable; urgency=medium
+
+  * Add conservative dpkg frontend lock preflight before privileged APT operations.
+  * Recheck frontend lock after the upgrade simulation, before execution.
+  * Add tests exercising genuine POSIX lock contention between processes.
+  * Begin the transaction backend redesign; no stable/crash-safe claims.
+
+ -- JatayuOS Team <maintainers@jatayuos.in>  Thu, 26 Nov 2026 19:45:00 +0530
+
 jatayu-update-manager (1.2.2~rc3-1) unstable; urgency=medium
 
   * Detect safe upgrades including newly required kernel images.

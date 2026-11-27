@@ -1,4 +1,7 @@
+import fcntl
 import hashlib
+import os
+import tempfile
 import importlib.util
 from importlib.machinery import SourceFileLoader
 import pathlib
@@ -50,6 +53,7 @@ class PrivilegeTests(unittest.TestCase):
     def test_changed_plan_rejected_without_running_upgrade(self):
         helper = load_helper()
         with patch.object(helper.os, 'geteuid', return_value=0), \
+             patch.object(helper, 'frontend_available', return_value=True), \
              patch.object(helper, 'preview', return_value=parse_simulation('Inst a [1] (2)\n')), \
              patch.object(helper.subprocess, 'run') as runner:
             self.assertEqual(helper.main(['upgrade', '0'*64]), 4)
@@ -59,6 +63,7 @@ class PrivilegeTests(unittest.TestCase):
         helper = load_helper()
         preview = parse_simulation('Inst a [1] (2)\n')
         with patch.object(helper.os, 'geteuid', return_value=0), \
+             patch.object(helper, 'frontend_available', return_value=True), \
              patch.object(helper, 'preview', return_value=preview), \
              patch.object(helper.subprocess, 'run', return_value=Mock(returncode=0)) as runner:
             self.assertEqual(helper.main(['upgrade', preview.digest]), 0)
@@ -76,11 +81,66 @@ class PrivilegeTests(unittest.TestCase):
     def test_refresh_fails_on_partial_repository_fetch(self):
         helper = load_helper()
         with patch.object(helper.os, 'geteuid', return_value=0), \
+             patch.object(helper, 'frontend_available', return_value=True), \
              patch.object(helper.subprocess, 'run', return_value=Mock(returncode=0)) as runner:
             self.assertEqual(helper.main(['refresh']), 0)
             cmd = runner.call_args.args[0]
             self.assertIn('APT::Update::Error-Mode=any', cmd)
             self.assertEqual(runner.call_args.kwargs['env'], helper.ENV)
+
+    def test_busy_frontend_blocks_refresh_without_apt(self):
+        helper = load_helper()
+        with patch.object(helper.os, 'geteuid', return_value=0), \
+             patch.object(helper, 'frontend_available', return_value=False), \
+             patch.object(helper.subprocess, 'run') as runner:
+            self.assertEqual(helper.main(['refresh']), helper.BUSY_EXIT)
+            runner.assert_not_called()
+
+    def test_busy_frontend_blocks_upgrade_before_preview(self):
+        helper = load_helper()
+        with patch.object(helper.os, 'geteuid', return_value=0), \
+             patch.object(helper, 'frontend_available', return_value=False), \
+             patch.object(helper, 'preview') as preview, \
+             patch.object(helper.subprocess, 'run') as runner:
+            self.assertEqual(helper.main(['upgrade', '0' * 64]), helper.BUSY_EXIT)
+            preview.assert_not_called()
+            runner.assert_not_called()
+
+    def test_frontend_becomes_busy_after_preview(self):
+        helper = load_helper()
+        plan = parse_simulation('Inst x [1] (2 Debian)\n')
+        with patch.object(helper.os, 'geteuid', return_value=0), \
+             patch.object(helper, 'frontend_available', side_effect=[True, False]), \
+             patch.object(helper, 'preview', return_value=plan), \
+             patch.object(helper.subprocess, 'run') as runner:
+            self.assertEqual(helper.main(['upgrade', plan.digest]), helper.BUSY_EXIT)
+            runner.assert_not_called()
+
+    def test_lock_conflict_is_detected_between_processes(self):
+        helper = load_helper()
+        with tempfile.TemporaryDirectory() as directory:
+            lock_path = os.path.join(directory, 'lock-frontend')
+            with open(lock_path, 'wb'):
+                pass
+            self.assertTrue(helper.frontend_available(lock_path))
+            # POSIX advisory record locks are per-process: use a subprocess
+            # as the owner; locking twice in this Python process is invalid.
+            owner = subprocess.Popen(
+                ['/usr/bin/python3', '-c',
+                 'import fcntl, sys, time; f=open(sys.argv[1], "r+b"); '
+                 'fcntl.lockf(f, fcntl.LOCK_EX); print("locked", flush=True); '
+                 'time.sleep(4)', lock_path],
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+            )
+            try:
+                self.assertEqual(owner.stdout.readline().strip(), 'locked')
+                self.assertFalse(helper.frontend_available(lock_path))
+            finally:
+                owner.terminate()
+                owner.wait(timeout=3)
+                owner.stdout.close()
+                owner.stderr.close()
+            self.assertTrue(helper.frontend_available(lock_path))
 
     def test_privileged_preview_allows_new_dependencies_without_removal(self):
         helper = load_helper()

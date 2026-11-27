@@ -18,3 +18,8 @@ override_dh_auto_install:
 	install -m 644 assets/in.jatayuos.update-manager.desktop debian/jatayu-update-manager/usr/share/applications/
 	install -d debian/jatayu-update-manager/usr/share/icons/hicolor/scalable/apps
 	install -m 644 assets/jatayu-update-manager.svg debian/jatayu-update-manager/usr/share/icons/hicolor/scalable/apps/jatayu-update-manager.svg
+	install -m 755 helper/transaction-worker debian/jatayu-update-manager/usr/lib/jatayu-update-manager/transaction-worker
+	install -m 755 helper/supervised-launcher debian/jatayu-update-manager/usr/lib/jatayu-update-manager/supervised-launcher
+	install -m 644 polkit/in.jatayuos.update-manager.supervised.policy debian/jatayu-update-manager/usr/share/polkit-1/actions/
+	install -m 755 helper/recovery-lookup debian/jatayu-update-manager/usr/lib/jatayu-update-manager/recovery-lookup
+	install -m 644 polkit/in.jatayuos.update-manager.recover.policy debian/jatayu-update-manager/usr/share/polkit-1/actions/
